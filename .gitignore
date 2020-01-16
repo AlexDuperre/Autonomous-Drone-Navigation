@@ -1,0 +1,10 @@
+
+.idea/
+
+tensorflow/__pycache__/
+
+tensorflow/checkpoint/
+
+*.npy
+
+tensorflow/NYU_FCRN-checkpoint.zip
