@@ -8,3 +8,5 @@ tensorflow/checkpoint/
 *.npy
 
 tensorflow/NYU_FCRN-checkpoint.zip
+
+*.pyc

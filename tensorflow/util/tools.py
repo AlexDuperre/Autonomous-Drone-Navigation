@@ -1,6 +1,7 @@
 import cv2, queue, threading
 from matplotlib.pylab import cm
 import numpy as np
+import pyexcel_ods
 
 def post_treatment(image, rel_goal, arrowpoint, min, max):
     image = ((image - image.min()) * (1 / (6 - 0) * 255)).astype('uint8')
@@ -26,4 +27,15 @@ def telemetry_transform(goal, split_data):
         current_orientation = current_orientation + 2 * np.pi
     rel_orientation = -1 * (current_orientation - goal_orientation)
     display_angle = rel_orientation + (np.pi / 2)
-    return rel_orientation, display_angle, rel_goal, rel_orientation
+    return rel_orientation, display_angle, rel_goal, goal_orientation
+
+def get_goals(path, world_number):
+    data = pyexcel_ods.get_data(path)
+    # print(data)
+    return data["Sheet1"][world_number][1:]
+
+
+# goals = get_goals("../ardrone_luxury_home_destinations.ods",1)
+
+# goal = eval(goals[0])
+# print(goal)

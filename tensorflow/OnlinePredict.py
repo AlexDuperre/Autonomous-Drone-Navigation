@@ -102,7 +102,7 @@ def predict(model_data_path):
 
 
             # Calculate relative position and arrow angle
-            rel_orientation, display_angle, rel_goal,rel_orientation = telemetry_transform(goal,split_data)
+            rel_orientation, display_angle, rel_goal,goal_orientation = telemetry_transform(goal,split_data)
             arrowpoint = (int(320 + 40*np.cos(display_angle)), int(320 - 40*np.sin(display_angle)))
 
             # get current frame
