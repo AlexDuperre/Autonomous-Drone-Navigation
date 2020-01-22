@@ -8,7 +8,7 @@ The program terminates when grave key(`) is pressed
 grave key is found below Esc key
 """
 
-import util.pyxhook as pyxhook
+import pyxhook as pyxhook
 
 # #change this to your log file's path
 # log_file='./file.log'
@@ -66,3 +66,5 @@ class Keystroke_Watcher:
     self.hm.UnhookKeyboard()
 
 
+# keywatch = Keystroke_Watcher()
+# keywatch.hm.start()

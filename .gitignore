@@ -10,3 +10,7 @@ tensorflow/checkpoint/
 tensorflow/NYU_FCRN-checkpoint.zip
 
 *.pyc
+
+*.h5
+
+tensorflow/util/__init__.py
