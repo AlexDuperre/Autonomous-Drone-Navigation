@@ -129,7 +129,7 @@ def predict(model_data_path):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-            # print(keyloggerFct.key)
+            print(keyloggerFct.key)
 
             # if statment for recording flight
             if (keyloggerFct.key == 'space') & (recording == True):
@@ -160,15 +160,15 @@ def predict(model_data_path):
                 destination_id += 1
                 destination = eval(destination_list[destination_id])
 
-                print("RECORDING STOPPED")
+                # print("RECORDING STOPPED")
 
             if keyloggerFct.key == 'Return':
                 recording = True
                 print("RECORDING")
 
-            if keyloggerFct.key == 'Backspace':
+            if keyloggerFct.key == 'BackSpace':
                 batch = []
-                running = False
+                recording = False
                 print("RECORDING DISCARDED")
 
             if running:
