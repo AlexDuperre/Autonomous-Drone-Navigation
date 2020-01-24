@@ -36,7 +36,7 @@ Select the number associated to the world
 8 - Scanned home
 """
 
-world_no = 1
+world_no = 6
 world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home"]
 
 # Initialize and start keylogger
@@ -94,7 +94,7 @@ def predict(model_data_path):
         batch = []
         while running:
             # Measuring time t1
-            t1 = time.time()
+            # t1 = time.time()
 
             # get current frame telemetry
             data = s2.recv(BUFFER_SIZE)
@@ -166,6 +166,11 @@ def predict(model_data_path):
                 recording = True
                 print("RECORDING")
 
+            if keyloggerFct.key == 'Backspace':
+                batch = []
+                running = False
+                print("RECORDING DISCARDED")
+
             if running:
                 if keyloggerFct.key == 'Escape':
                     # escape key pressed
@@ -175,7 +180,7 @@ def predict(model_data_path):
                 print('error reading video feed')
 
             # Measuring time t2
-            t2 = time.time()
+            # t2 = time.time()
             # print(t2-t1)
         plt.ioff()
         plt.show()
