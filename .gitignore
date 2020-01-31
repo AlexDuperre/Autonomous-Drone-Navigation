@@ -14,3 +14,5 @@ tensorflow/NYU_FCRN-checkpoint.zip
 *.h5
 
 tensorflow/util/__init__.py
+
+*.hdf5
