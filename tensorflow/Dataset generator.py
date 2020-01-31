@@ -36,7 +36,7 @@ Select the number associated to the world
 8 - Scanned home
 """
 
-world_no = 6
+world_no = 7
 world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home"]
 
 # Initialize and start keylogger
@@ -143,7 +143,7 @@ def predict(model_data_path):
                 title = directory + "/path_" + str(last_destination_id) + "_" + str(destination_id) + "_000.h5"
                 title = indexer(title)
 
-                with h5py.File(title,"w") as hdf:
+                with h5py.File(title,"w") as hdf:       
                     hdf.create_dataset("depth", data=extract_data(batch, 0), compression="gzip")
                     hdf.create_dataset("video", data=extract_data(batch, 1), compression="gzip")
                     hdf.create_dataset("rel_goalx", data=extract_data(batch, 2), compression="gzip")
@@ -152,15 +152,16 @@ def predict(model_data_path):
                     hdf.create_dataset("rel_orientation", data=extract_data(batch, 5), compression="gzip")
                     hdf.create_dataset("GT", data=extract_data(batch, 6), compression="gzip")
 
+
                 batch = []
                 recording = False
                 # save last destination and get new destination
                 last_destination_id = destination_id
-                # destination_id = np.random.randint(len(destination_list))
-                destination_id += 1
+                destination_id = np.random.randint(len(destination_list))
+                # destination_id += 1
                 destination = eval(destination_list[destination_id])
 
-                # print("RECORDING STOPPED")
+                print("RECORDING STOPPED")
 
             if keyloggerFct.key == 'Return':
                 recording = True
