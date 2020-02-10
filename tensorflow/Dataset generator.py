@@ -34,10 +34,11 @@ Select the number associated to the world
 6 - office
 7 - Resto bar
 8 - Scanned home
+9 - Scanned home 2nd floor
 """
 
-world_no = 7
-world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home"]
+world_no = 9
+world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home", "scanned_home_2e_floor"]
 
 # Initialize and start keylogger
 keyloggerFct.init()
@@ -135,7 +136,7 @@ def predict(model_data_path):
             if (keyloggerFct.key == 'space') & (recording == True):
 
                 # Create saving directory if it doesn't exist
-                directory = "./dataset/ardrone_" + world_strings[world_no-1]
+                directory = "/tmp/dataset/ardrone_" + world_strings[world_no-1]
                 if not os.path.exists(directory):
                     os.makedirs(directory)
 
