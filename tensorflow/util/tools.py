@@ -66,12 +66,12 @@ def telemetry_transform(goal, split_data):
     goal_orientation = np.arctan2(rel_goal[1], rel_goal[0])
     # get current orientation in ROS environment
     current_orientation = float(split_data[3])
-    # put all angles between 0 and pi
+    # put all angles between 0 and 2pi
     if goal_orientation < 0:
         goal_orientation = goal_orientation + 2 * np.pi
     if current_orientation < 0:
         current_orientation = current_orientation + 2 * np.pi
-    # Calculate relative angle to objective (*-1 to have right in the negative)
+    # Calculate relative angle to objective (*-1 to have the arrow on the right when negative)
     rel_orientation = -1 * (current_orientation - goal_orientation)
     display_angle = rel_orientation + (np.pi / 2)
     return rel_orientation, display_angle, rel_goal, goal_orientation
