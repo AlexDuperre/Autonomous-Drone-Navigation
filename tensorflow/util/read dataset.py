@@ -18,7 +18,8 @@ def display_trajectory(image, rel_goal, rel_orientation):
     arrowpoint = (int(320 + 40 * np.cos(display_angle)), int(320 - 40 * np.sin(display_angle)))
     rel_orientation = fix_angle(rel_orientation)
 
-    image = ((image - image.min()) * (1 / (6 - 0) * 255)).astype('uint8')
+    # image = ((image - image.min()) * (1 / (6 - 0) * 255)).astype('uint8') # to be used with raw dataset
+    image = image*2.0  # to be used with the normalized dataset (adjust scale)
     image = np.uint8(cm.jet(image) * 255)
     image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
     image = cv2.resize(image, (int(640), int(360)))

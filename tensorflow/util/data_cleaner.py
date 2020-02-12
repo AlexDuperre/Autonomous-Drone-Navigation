@@ -5,6 +5,11 @@ import numpy as np
 import matplotlib.pylab as plt
 from matplotlib.pylab import cm
 
+from collections import defaultdict
+from multiprocessing import Pool
+from functools import partial
+from functools import reduce
+
 class class_counter():
     def __init__(self):
         self.f = open("class_count.txt","r+")
@@ -17,11 +22,9 @@ class class_counter():
             self.data = self.data.split(",")
             self.data = [eval(nb) for nb in self.data]
 
-        # f.write(str(self.data))
-        # f.close()
     
-    def add(self, class_nb):
-        self.data[class_nb] += 1
+    def add(self, count):
+        self.data = list(np.asarray(self.data) + count)
         
     def save_data(self):
         self.f.truncate(0)
@@ -31,7 +34,7 @@ class class_counter():
 
         
 
-def replace_keys(f, counter, idx, GT):
+def replace_keys_parallel(GT):
 
     GT = GT.decode()
     # print(GT)
@@ -115,33 +118,57 @@ def replace_keys(f, counter, idx, GT):
         GT = 5
 
     # Add one to the class counter
-    counter.add(GT)
+    # counter.add(GT)
 
     # print(bytes(str(GT),encoding='utf8'))
-    f["GT"][idx] = bytes(str(GT),encoding='utf8')
+    return bytes(str(GT),encoding='utf8')
 
 
-
-def rescale_video(f, idx, image):
+def rescale_video(image):
     #rescale and normalize video
     image = cv2.resize(image, dsize=(320,192), interpolation=cv2.INTER_CUBIC)
     image = (image - image.min())/(image.max() - image.min())
-    f["video"][idx, 0, 0:192, 0:320] = image
+    return image
 
 
-def normalize_depth(f, idx, depth):
+def normalize_depth(depth):
     depth = (depth - depth.min())/(6.0 - depth.min())
-    f["depth"][idx] = depth
+    return depth
 
 
-def fix_angle(f, idx, rel_orientation):
+def fix_angle(rel_orientation):
     # makes sure the angle is between pi and - pi
     if rel_orientation > np.pi:
         rel_orientation = -1.0*(2*np.pi - rel_orientation)
     elif rel_orientation < -np.pi:
         rel_orientation = 2*np.pi - (-1.0*rel_orientation)
     # normalises the angle between -1 an 1
-    f["rel_orientation"][idx] = np.around(np.float32(rel_orientation/ np.pi), 3)
+    return np.around(np.float32(rel_orientation/ np.pi), 3)
+
+
+def fun(idx, h5pyData):
+    print("iteration # ", idx)
+    # class_count = defaultdict(int)
+    data = {}
+
+    # Replace GT keys for class number
+    GT = h5pyData["GT"][idx]
+    data["GT"] = replace_keys_parallel( GT)
+
+    # rescale & normalize video
+    image = h5pyData["video"][idx][0]
+    data["video"] = rescale_video(image)
+
+    # Normalize depth
+    depth = h5pyData["depth"][idx]
+    data["depth"] = normalize_depth(depth)
+
+    # fix and normalize the rel_orientation angle
+    rel_orientation = h5pyData["rel_orientation"][idx]
+    data["rel_orientation"] = fix_angle(rel_orientation)
+
+    return data
+
 
 
 
@@ -149,35 +176,69 @@ def main():
     file_path = "/tmp/dataset/path_1_21_000.h5"#""./path_7_5_001.h5"
 
     counter = class_counter()
-    f = h5py.File(file_path, "a")
+    with h5py.File(file_path, "a") as f:
 
-    for idx in range(len(f["GT"])):
-        print("iteration # ", idx)
+        length = len(f["GT"])
+        print("Length = ", length)
 
-        # Replace GT keys for class number
-        GT = f["GT"][idx]
-        replace_keys(f, counter, idx, GT)
+        data = {}
+        data["GT"] = f["GT"][0:length]
+        data["video"] = f["video"][0:length]
+        data["depth"] = f["depth"][0:length]
+        data["rel_orientation"] = f["rel_orientation"][0:length]
 
-        # rescale & normalize video
-        image = f["video"][idx][0]
-        rescale_video(f, idx, image)
+        p = Pool(8)
 
-        # Normalize depth
-        depth = f["depth"][idx]
-        normalize_depth(f, idx, depth)
+        max_items = 500
+        max_i = length//max_items
+        for i in range(max_i+1):
+            d = {}
+            if i==max_i:
+                d["GT"] = data["GT"][max_items * i:]
+                d["video"] = data["video"][max_items * i:]
+                d["depth"] = data["depth"][max_items * i:]
+                d["rel_orientation"] = data["rel_orientation"][max_items * i:]
+                partial_func = partial(fun, h5pyData=d)
+                if i==0:
+                    out = p.map(partial_func, range(length-max_items*max_i))
+                else:
+                    out.extend(p.map(partial_func, range(length-max_items*max_i)))
+            else:
+                d["GT"] = data["GT"][max_items * i: max_items*(i+1)]
+                d["video"] = data["video"][max_items * i: max_items*(i+1)]
+                d["depth"] = data["depth"][max_items * i: max_items*(i+1)]
+                d["rel_orientation"] = data["rel_orientation"][max_items * i: max_items*(i+1)]
+                partial_func = partial(fun, h5pyData=d)
+                if i==0:
+                    out = p.map(partial_func, range(max_items))
+                else:
+                    out.extend(p.map(partial_func, range(max_items)))
 
-        # fix and normalize the rel_orientation angle
-        rel_orientation = f["rel_orientation"][idx]
-        fix_angle(f, idx, rel_orientation)
+        data = {}
+        for k in out[0].keys():
+            data[k] = np.stack(list(data[k] for data in out))
 
-    # Resize raw video
-    f["video"].resize((381,1,192,320,3))
+        onehot = np.zeros((len(data["GT"]),6))
+        onehot[np.arange(len(data["GT"])), np.int8(data["GT"])] = 1
 
-    # save number of items per cathegoies up till now
-    counter.save_data()
+        # save number of items per categories up till now
+        count = np.sum(onehot, axis=0)
+        counter.add(count)
+        counter.save_data()
 
-    # close hdf5 file
-    f.close()
+        # Resize raw video
+        f["video"].resize((length,1,192,320,3))
+
+        # Resize data array to (length,1,192,320,3)
+        data["video"] = np.expand_dims(data["video"], axis=1)
+
+        # Rewrite new data
+        f["GT"][:] = data["GT"]
+        f["video"][:] = data["video"]
+        f["depth"][:] = data["depth"]
+        f["rel_orientation"][:] = data["rel_orientation"]
+
+
 
 if __name__ == '__main__':
     main()
