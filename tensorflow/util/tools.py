@@ -71,7 +71,7 @@ def telemetry_transform(goal, split_data):
         goal_orientation = goal_orientation + 2 * np.pi
     if current_orientation < 0:
         current_orientation = current_orientation + 2 * np.pi
-    # Calculate relative angle to objective (*-1 to have the arrow on the right when negative)
+    # Calculate relative angle to objective (*-1 to have the arrow on the right when negative.)
     rel_orientation = -1 * (current_orientation - goal_orientation)
     display_angle = rel_orientation + (np.pi / 2)
     return rel_orientation, display_angle, rel_goal, goal_orientation

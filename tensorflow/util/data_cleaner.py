@@ -1,3 +1,4 @@
+import sys
 import h5py
 from itertools import compress
 import cv2
@@ -32,7 +33,7 @@ class class_counter():
         self.f.write(str(self.data).strip("[]"))
         self.f.close()
 
-        
+
 
 def replace_keys_parallel(GT):
 
@@ -127,7 +128,7 @@ def replace_keys_parallel(GT):
 def rescale_video(image):
     #rescale and normalize video
     image = cv2.resize(image, dsize=(320,192), interpolation=cv2.INTER_CUBIC)
-    image = (image - image.min())/(image.max() - image.min())
+    image = (image - image.min())/(image.max() - image.min() + 0.000001)
     return image
 
 
@@ -147,8 +148,6 @@ def fix_angle(rel_orientation):
 
 
 def fun(idx, h5pyData):
-    print("iteration # ", idx)
-    # class_count = defaultdict(int)
     data = {}
 
     # Replace GT keys for class number
@@ -172,27 +171,34 @@ def fun(idx, h5pyData):
 
 
 
-def main():
-    file_path = "/tmp/dataset/path_1_21_000.h5"#""./path_7_5_001.h5"
+def main(file_path):
+    #"./path_7_5_001.h5"
 
     counter = class_counter()
     with h5py.File(file_path, "a") as f:
 
+        # Get length of dataset
         length = len(f["GT"])
         print("Length = ", length)
 
+        # Save dataset into a new list variable
         data = {}
         data["GT"] = f["GT"][0:length]
         data["video"] = f["video"][0:length]
         data["depth"] = f["depth"][0:length]
         data["rel_orientation"] = f["rel_orientation"][0:length]
 
+        # Create a new pool
         p = Pool(8)
 
+        # Set max chunk size and max i to avoid indexing error
         max_items = 500
         max_i = length//max_items
         for i in range(max_i+1):
             d = {}
+
+            # Check if we need to match the index to the end of the file then use
+            # multiprocessing to clean the dataset chunks and extend the list
             if i==max_i:
                 d["GT"] = data["GT"][max_items * i:]
                 d["video"] = data["video"][max_items * i:]
@@ -214,10 +220,12 @@ def main():
                 else:
                     out.extend(p.map(partial_func, range(max_items)))
 
+        # Aggregate data as ndarray to their specific key
         data = {}
         for k in out[0].keys():
             data[k] = np.stack(list(data[k] for data in out))
 
+        # Calculate the number of classes in this trajectory
         onehot = np.zeros((len(data["GT"]),6))
         onehot[np.arange(len(data["GT"])), np.int8(data["GT"])] = 1
 
@@ -241,4 +249,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1])
