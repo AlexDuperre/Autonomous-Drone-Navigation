@@ -8,10 +8,10 @@ import pandas as pd
 import torch
 from scipy.spatial.transform import Rotation
 
-from util.MidAirSegmenter import MidAirDataSegmenter
+from util.MidAirSegmenter import DNDSegmenter
 
 
-data_segmenter = MidAirDataSegmenter("./")
+data_segmenter = DNDSegmenter("./")
 table = data_segmenter.segment((20,50), 10)
 
 print(table[45][0])

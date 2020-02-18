@@ -64,7 +64,7 @@ class TrajectorySegmenter:
             raise InvalidSizeException("sequence_length_range should have length of either 1 or 2")
 
 
-class MidAirDataSegmenter(TrajectorySegmenter):
+class DNDSegmenter(TrajectorySegmenter):
     def __init__(self, path_to_data: str):
         self.path_to_data = path_to_data
 
