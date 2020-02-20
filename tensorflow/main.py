@@ -35,7 +35,7 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("./util/", frames_nb=hyper_params["frame_nb"]*hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("/media/aldupd/UNTITLED 2/dataset", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 print("Dataset length: ", dataset.__len__())
 
 
@@ -99,18 +99,19 @@ for epoch in range(hyper_params["num_epochs"]):
     model.train()
     outputs = []
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(train_loader):
-        depth = depth.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).requires_grad_()
-        rel_orientation = rel_orientation.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goalx = rel_goalx.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goaly = rel_goaly.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], -1).requires_grad_()
-        labels = labels.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"])
+        actual_subsegmen_nb = int(depth.shape[1]/hyper_params["frame_nb"])
+        depth = depth.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).requires_grad_()
+        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], -1).requires_grad_()
+        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], -1).requires_grad_()
+        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], -1).requires_grad_()
+        labels = labels.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"])
 
         # Initialize hidden state with zeros
         hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
         # Initialize cell state
         cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
 
-        for j in range(hyper_params["sub_segment_nb"]):
+        for j in range(actual_subsegmen_nb):
             inputA = depth[:,j,:,:,:].cuda()
             inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:], rel_goaly[:,j,:,:]], -1).cuda()
             input = [inputA, inputB]
@@ -131,7 +132,7 @@ for epoch in range(hyper_params["num_epochs"]):
         step += 1
         experiment.log_metric("train_batch_loss", loss.item(), step=step)
 
-        if (i + 1) % 10 == 0:
+        if (i + 1) % 2 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                   .format(epoch + 1, hyper_params["num_epochs"], i + 1, total_step, loss.item()))
 
@@ -149,24 +150,19 @@ for epoch in range(hyper_params["num_epochs"]):
         total = 0
         meanLoss = 0
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(valid_loader):
-            depth = depth.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"],
-                               depth.shape[2], depth.shape[3]).requires_grad_()
-            rel_orientation = rel_orientation.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"],
-                                                   hyper_params["frame_nb"], -1).requires_grad_()
-            rel_goalx = rel_goalx.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"],
-                                       hyper_params["frame_nb"], -1).requires_grad_()
-            rel_goaly = rel_goaly.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"],
-                                       hyper_params["frame_nb"], -1).requires_grad_()
-            labels = labels.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"])
+            actual_subsegmen_nb = int(depth.shape[1] / hyper_params["frame_nb"])
+            depth = depth.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],depth.shape[2], depth.shape[3]).requires_grad_()
+            rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegmen_nb,hyper_params["frame_nb"], -1).requires_grad_()
+            rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
+            rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
+            labels = labels.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"])
 
             # Initialize hidden state with zeros
-            hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],
-                             hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+            hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
             # Initialize cell state
-            cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],
-                             hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+            cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
 
-            for j in range(hyper_params["sub_segment_nb"]):
+            for j in range(actual_subsegmen_nb):
                 inputA = depth[:, j, :, :, :].cuda()
                 inputB = torch.cat([rel_orientation[:, j, :, :], rel_goalx[:, j, :, :], rel_goaly[:, j, :, :]],
                                    -1).cuda()
@@ -178,9 +174,9 @@ for epoch in range(hyper_params["num_epochs"]):
 
                 loss = criterion(outputs.view(-1, 6), label.view(-1))
                 meanLoss += loss.cpu().detach().numpy()
-            _, predicted = torch.max(outputs.data, 2)
-            total += len(labels.view(-1))
-            correct += (predicted == labels.view(-1)).sum().item()
+                _, predicted = torch.max(outputs.data, 2)
+                total += len(label.view(-1))
+                correct += (predicted.view(-1) == label.view(-1)).sum().item()
 
 
         acc = 100 * correct / total
@@ -208,18 +204,19 @@ with torch.no_grad():
     predictions = np.empty((0,1))
     ground_truth = np.empty((0,1))
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(test_loader):
-        depth = depth.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).requires_grad_()
-        rel_orientation = rel_orientation.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goalx = rel_goalx.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goaly = rel_goaly.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"], -1).requires_grad_()
-        labels = labels.view(hyper_params["batch_size"], hyper_params["sub_segment_nb"], hyper_params["frame_nb"])
+        actual_subsegmen_nb = int(depth.shape[1] / hyper_params["frame_nb"])
+        depth = depth.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], depth.shape[2],depth.shape[3]).requires_grad_()
+        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegmen_nb,hyper_params["frame_nb"], -1).requires_grad_()
+        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
+        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
+        labels = labels.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"])
 
         # Initialize hidden state with zeros
         hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
         # Initialize cell state
         cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
 
-        for j in range(hyper_params["sub_segment_nb"]):
+        for j in range(actual_subsegmen_nb):
             inputA = depth[:,j,:,:,:].cuda()
             inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:], rel_goaly[:,j,:,:]], -1).cuda()
             input = [inputA, inputB]
@@ -232,12 +229,14 @@ with torch.no_grad():
             loss = criterion(outputs.view(-1,6), label.view(-1))
             meanLoss += loss.cpu().detach().numpy()
 
-        meanLoss += loss.cpu().detach().numpy()
-        _, predicted = torch.max(outputs.data, 2)
-        predictions = np.append(predictions,predicted.cpu().detach().numpy())
-        ground_truth = np.append(ground_truth,labels.cpu().detach().numpy())
-        total += len(labels.view(-1))
-        correct += (predicted == labels.view(-1)).sum().item()
+            meanLoss += loss.cpu().detach().numpy()
+            _, predicted = torch.max(outputs.data, 2)
+
+            predictions = np.append(predictions,predicted.cpu().detach().numpy())
+            ground_truth = np.append(ground_truth,labels.cpu().detach().numpy())
+
+            total += len(label.view(-1))
+            correct += (predicted.view(-1) == label.view(-1)).sum().item()
 
 
     test_acc = 100 * correct / total

@@ -11,9 +11,9 @@ from matplotlib.pylab import cm
 from util.MidAirSegmenter import DNDSegmenter
 
 class DND(Dataset):
-    def __init__(self, data_dir, transform = None, frames_nb=30, overlap=20):
+    def __init__(self, data_dir, transform = None, frames_nb=30, subsegment_nb=1, overlap=20):
         data_segmenter = DNDSegmenter(data_dir)
-        self.Table = data_segmenter.segment((frames_nb,), overlap)
+        self.Table = data_segmenter.segment((frames_nb,), overlap,subsegment_nb)
 
         self.transform = transform
 
