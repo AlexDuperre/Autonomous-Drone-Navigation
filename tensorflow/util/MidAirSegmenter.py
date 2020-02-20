@@ -25,16 +25,20 @@ class TrajectorySegmenter:
             return dataframe.values.tolist()
 
         elif len(sequence_length_range) == 1:
-            start_frames = list(
-                range(0, trajectory_length - sequence_length_range[0], sequence_length_range[0] - overlap))
+            if sequence_length_range[0]>trajectory_length:
+                start_frames = [0]
+                sequence_lengths = trajectory_length
+            else:
+                start_frames = list(
+                    range(0, trajectory_length - sequence_length_range[0], sequence_length_range[0] - overlap))
 
-            dropped_frames = (trajectory_length - 1) - (start_frames[-1] + sequence_length_range[0])
+                dropped_frames = (trajectory_length - 1) - (start_frames[-1] + sequence_length_range[0])
 
-            if dropped_frames > 0:
-                print("Last {} frames not used for trajectory {}".format(dropped_frames,
-                                                                         trajectory))
+                if dropped_frames > 0:
+                    print("Last {} frames not used for trajectory {}".format(dropped_frames,
+                                                                             trajectory))
 
-            sequence_lengths = [sequence_length_range[0]] * len(start_frames)
+                sequence_lengths = [sequence_length_range[0]] * len(start_frames)
             sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
             dataframe = pd.DataFrame(sequence)
             # serialization_destination.create_dataset('trajectory_segments', data=dataframe.to_numpy())

@@ -1,6 +1,7 @@
 from torchvision.models import densenet201
 import torch
 import torch.nn as nn
+from GPUtil import showUtilization as gpu_usage
 
 class LSTMModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, layer_dim, output_dim):
@@ -27,13 +28,14 @@ class LSTMModel(nn.Module):
         # Building your LSTM
         # batch_first=True causes input/output tensors to be of shape
         # (batch_dim, seq_dim, feature_dim)
-        self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=True)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=False)
 
         # Readout layer
         self.fc = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, x):
+    def forward(self, x, hn, cn):
         batch_size, seq_length, height, width = x[0].shape
+
         images = x[0].reshape(batch_size*seq_length, height, width)
         images = images.unsqueeze(dim=1)
         featuresA = self.densenet(images)
@@ -44,19 +46,74 @@ class LSTMModel(nn.Module):
         Features = torch.cat([featuresA, featuresB.type(torch.float)], dim=2)
 
         # Initialize hidden state with zeros
-        h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
-
-        # Initialize cell state
-        c0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+        # h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+        #
+        # # Initialize cell state
+        # c0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
 
         # One time step
         # We need to detach as we are doing truncated backpropagation through time (BPTT)
         # If we don't, we'll backprop all the way to the start even after going through another batch
-        out, (hn, cn) = self.lstm(Features, (h0.detach(), c0.detach()))
+        out, (hn, cn) = self.lstm(Features.permute(1,0,2), (hn, cn))
 
         # Index hidden state of last time step
         # out.size() --> 100, 28, 100
         # out[:, -1, :] --> 100, 100 --> just want last time step hidden states!
         out = self.fc(out)
         # out.size() --> 100, 10
-        return out
+        return out, (hn, cn)
+
+# class LSTMModel(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, layer_dim, output_dim):
+#         super(LSTMModel, self).__init__()
+#
+#
+#         ############################################
+#         #LSTM
+#
+#         # Hidden dimensions
+#         self.hidden_dim = hidden_dim
+#
+#         # Number of hidden layers
+#         self.layer_dim = layer_dim
+#
+#         # Building your LSTM
+#         # batch_first=True causes input/output tensors to be of shape
+#         # (batch_dim, seq_dim, feature_dim)
+#         self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=True)
+#
+#         # Readout layer
+#         self.fc = nn.Linear(hidden_dim, output_dim)
+#
+#     def forward(self, x, hn, cn):
+#         batch_size, seq_length, height, width = x[0].shape
+#         images = x[0].reshape(batch_size*seq_length, height, width)
+#         images = images.unsqueeze(dim=1)
+#         featuresA = self.densenet(images)
+#         print("GPU USAGE", gpu_usage())
+#         featuresA = featuresA.reshape(batch_size, seq_length,-1)
+#
+#         # Concatenate features together
+#         featuresB = x[1]
+#         Features = torch.cat([featuresA, featuresB.type(torch.float)], dim=2)
+#
+#         # Initialize hidden state with zeros
+#         # h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+#         #
+#         # # Initialize cell state
+#         # c0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+#
+#         # One time step
+#         # We need to detach as we are doing truncated backpropagation through time (BPTT)
+#         # If we don't, we'll backprop all the way to the start even after going through another batch
+#         out, (hn, cn) = self.lstm(Features, (hn, cn))
+#
+#         # Index hidden state of last time step
+#         # out.size() --> 100, 28, 100
+#         # out[:, -1, :] --> 100, 100 --> just want last time step hidden states!
+#         out = self.fc(out)
+#         # out.size() --> 100, 10
+#         return out, (hn, cn)
+#
+#
+# def model
