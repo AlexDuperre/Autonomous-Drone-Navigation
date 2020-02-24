@@ -10,12 +10,13 @@ from GPUtil import showUtilization as gpu_usage
 
 
 hyper_params = {
-    "validationRatio" : 0.5,
+    "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
     "batch_size" : 1,
-    "learning_rate" : 0.0001,
-    "num_epochs" : 1,
-    "input_dim" : 100,
+    "learning_rate" : 0.01,
+    "specific_lr" : 0.00001,
+    "num_epochs" : 10,
+    "input_dim" : 50,
     "hidden_dim" : 100,
     "layer_dim" : 1,
     "output_dim" : 6,
@@ -35,7 +36,7 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("/media/aldupd/UNTITLED 2/dataset", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("/media/aldupd/UNTITLED 2/dataset/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 print("Dataset length: ", dataset.__len__())
 
 
@@ -72,6 +73,7 @@ test_loader = torch.utils.data.DataLoader(dataset=dataset,
 print(len(train_loader))
 print(len(valid_loader))
 print(len(test_loader))
+
 # MODEL
 model = LSTMModel(input_dim=hyper_params["input_dim"],
                   hidden_dim=hyper_params["hidden_dim"],
@@ -82,7 +84,11 @@ model = model.cuda()
 # LOSS
 criterion = nn.CrossEntropyLoss()
 # criterion = FocalLoss(gamma=4)
-optimizer = torch.optim.Adam(model.parameters(), lr=hyper_params["learning_rate"])
+optimizer = torch.optim.Adam([{"params" : model.densenet.features.parameters(), "lr" : hyper_params["specific_lr"]},
+                              {"params" : model.densenet.classifier.parameters()},
+                              {"params" : model.lstm.parameters()},
+                              {"params" : model.fc.parameters()}],
+                             lr=hyper_params["learning_rate"])
 
 
 print("model loaded")
@@ -132,7 +138,7 @@ for epoch in range(hyper_params["num_epochs"]):
         step += 1
         experiment.log_metric("train_batch_loss", loss.item(), step=step)
 
-        if (i + 1) % 2 == 0:
+        if (i + 1) % 15 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                   .format(epoch + 1, hyper_params["num_epochs"], i + 1, total_step, loss.item()))
 
@@ -251,7 +257,13 @@ plt.plot(x,validLoss)
 plt.subplot(1,2,2)
 plt.plot(x,validAcc)
 # plt.savefig(path+'/learning_curve.png')
-plt.show()
+# plt.show()
 
 experiment.log_metric("test_loss", meanLoss / len(test_loader), step=epoch)
 experiment.log_metric("test_accuracy", acc, step=epoch)
+
+dict = {
+    "test_acc" : test_acc
+}
+
+experiment.send_notification("finished", "ok tamere", dict)

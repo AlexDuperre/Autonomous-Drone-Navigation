@@ -31,6 +31,8 @@ class TrajectorySegmenter:
             if sequence_length_range[0]>trajectory_length:
                 start_frames = [0]
                 sequence_lengths = trajectory_length//subsequence_frame_nb[0] * subsequence_frame_nb[0]
+                if trajectory_length//subsequence_frame_nb[0] == 0:
+                    print("###########sequence too small#############")
             else:
                 start_frames = list(
                     range(0, trajectory_length - sequence_length_range[0], sequence_length_range[0] - overlap))
