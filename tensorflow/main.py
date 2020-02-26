@@ -21,7 +21,7 @@ hyper_params = {
     "learning_rate" : 0.0005,
     "specific_lr" : 0.00001,
     "num_epochs" : 10,
-    "input_dim" : 1000,
+    "input_dim" : 4227,
     "hidden_dim" : 1000,
     "layer_dim" : 1,
     "output_dim" : 6,
@@ -42,7 +42,7 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("/media/aldupd/UNTITLED 2/dataset", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("./util/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 print("Dataset length: ", dataset.__len__())
 
 
@@ -90,8 +90,12 @@ model = model.cuda()
 # LOSS
 criterion = nn.CrossEntropyLoss(weight=torch.Tensor([3.2046819111, 1, 5.9049048165, 5.4645210478, 15.7675989943, 15.4961006872]).cuda())
 # criterion = FocalLoss(gamma=4)
-optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
-                              {"params": model.densenet.classifier.parameters()},
+# optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
+#                               {"params": model.densenet.classifier.parameters()},
+#                               {"params": model.lstm.parameters()},
+#                               {"params": model.fc.parameters()}],
+#                              lr=hyper_params["learning_rate"])
+optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hyper_params["specific_lr"]},
                               {"params": model.lstm.parameters()},
                               {"params": model.fc.parameters()}],
                              lr=hyper_params["learning_rate"])
