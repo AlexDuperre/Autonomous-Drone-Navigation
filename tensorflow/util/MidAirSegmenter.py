@@ -31,6 +31,7 @@ class TrajectorySegmenter:
             if sequence_length_range[0]>trajectory_length:
                 start_frames = [0]
                 sequence_lengths = trajectory_length//subsequence_frame_nb[0] * subsequence_frame_nb[0]
+                print(sequence_lengths)
                 if trajectory_length//subsequence_frame_nb[0] == 0:
                     print("###########sequence too small#############")
             else:

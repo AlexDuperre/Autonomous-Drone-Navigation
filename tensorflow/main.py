@@ -6,6 +6,11 @@ import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
 from util.pytorchtools import EarlyStopping
+import torchvision.transforms as transforms
+from torch.optim import lr_scheduler
+from util.focalloss import FocalLoss
+from sklearn.metrics import confusion_matrix
+from util.confusion_matrix import plot_confusion_matrix
 from GPUtil import showUtilization as gpu_usage
 
 
@@ -13,17 +18,18 @@ hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
     "batch_size" : 1,
-    "learning_rate" : 0.01,
+    "learning_rate" : 0.0005,
     "specific_lr" : 0.00001,
     "num_epochs" : 10,
-    "input_dim" : 50,
-    "hidden_dim" : 100,
+    "input_dim" : 1000,
+    "hidden_dim" : 1000,
     "layer_dim" : 1,
     "output_dim" : 6,
-    "frame_nb" : 30,
+    "frame_nb" : 90,
     "sub_segment_nb": 10,
     "segment_overlap": 0,
-    "patience" : 7
+    "patience" : 7,
+    "skip_frames" : 3
 }
 
 
@@ -36,7 +42,7 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("/media/aldupd/UNTITLED 2/dataset/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("/media/aldupd/UNTITLED 2/dataset", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 print("Dataset length: ", dataset.__len__())
 
 
@@ -82,12 +88,12 @@ model = LSTMModel(input_dim=hyper_params["input_dim"],
 model = model.cuda()
 
 # LOSS
-criterion = nn.CrossEntropyLoss()
+criterion = nn.CrossEntropyLoss(weight=torch.Tensor([3.2046819111, 1, 5.9049048165, 5.4645210478, 15.7675989943, 15.4961006872]).cuda())
 # criterion = FocalLoss(gamma=4)
-optimizer = torch.optim.Adam([{"params" : model.densenet.features.parameters(), "lr" : hyper_params["specific_lr"]},
-                              {"params" : model.densenet.classifier.parameters()},
-                              {"params" : model.lstm.parameters()},
-                              {"params" : model.fc.parameters()}],
+optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
+                              {"params": model.densenet.classifier.parameters()},
+                              {"params": model.lstm.parameters()},
+                              {"params": model.fc.parameters()}],
                              lr=hyper_params["learning_rate"])
 
 
@@ -96,6 +102,7 @@ print("model loaded")
 trainLoss = []
 validLoss = []
 validAcc = []
+eps = 0.0000000001
 best_val_acc = 0
 step = 0
 total_step = len(train_loader)
@@ -105,21 +112,27 @@ for epoch in range(hyper_params["num_epochs"]):
     model.train()
     outputs = []
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(train_loader):
-        actual_subsegmen_nb = int(depth.shape[1]/hyper_params["frame_nb"])
-        depth = depth.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).requires_grad_()
-        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], -1).requires_grad_()
-        labels = labels.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"])
+        actual_subsegment_nb = int(depth.shape[1]/hyper_params["frame_nb"])
+        depth = depth.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).requires_grad_()
+        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], -1).requires_grad_()
+        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], -1).requires_grad_()
+        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], -1).requires_grad_()
+        labels = labels.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"])
+
+        depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :]
+        rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
+        rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :]
+        rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :]
+        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
 
         # Initialize hidden state with zeros
-        hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+        hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).requires_grad_().cuda()
         # Initialize cell state
-        cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+        cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).requires_grad_().cuda()
 
-        for j in range(actual_subsegmen_nb):
+        for j in range(actual_subsegment_nb):
             inputA = depth[:,j,:,:,:].cuda()
-            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:], rel_goaly[:,j,:,:]], -1).cuda()
+            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:]+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:]+eps)], -1).cuda()
             input = [inputA, inputB]
             label = labels[:,j,:].cuda()
 
@@ -156,22 +169,27 @@ for epoch in range(hyper_params["num_epochs"]):
         total = 0
         meanLoss = 0
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(valid_loader):
-            actual_subsegmen_nb = int(depth.shape[1] / hyper_params["frame_nb"])
-            depth = depth.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],depth.shape[2], depth.shape[3]).requires_grad_()
-            rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegmen_nb,hyper_params["frame_nb"], -1).requires_grad_()
-            rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
-            rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
-            labels = labels.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"])
+            actual_subsegment_nb = int(depth.shape[1] / hyper_params["frame_nb"])
+            depth = depth.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],depth.shape[2], depth.shape[3]).requires_grad_()
+            rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegment_nb,hyper_params["frame_nb"], -1).requires_grad_()
+            rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
+            rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
+            labels = labels.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"])
+
+            depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :]
+            rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
+            rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :]
+            rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :]
+            labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
 
             # Initialize hidden state with zeros
             hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
             # Initialize cell state
             cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
 
-            for j in range(actual_subsegmen_nb):
+            for j in range(actual_subsegment_nb):
                 inputA = depth[:, j, :, :, :].cuda()
-                inputB = torch.cat([rel_orientation[:, j, :, :], rel_goalx[:, j, :, :], rel_goaly[:, j, :, :]],
-                                   -1).cuda()
+                inputB = torch.cat([rel_orientation[:, j, :, :], rel_goalx[:, j, :, :] / (rel_goalx[:, 0, 0, :] + eps), rel_goaly[:, j, :, :] / (rel_goaly[:, 0, 0, :] + eps)], -1).cuda()
                 input = [inputA, inputB]
                 label = labels[:, j, :].cuda()
 
@@ -210,21 +228,27 @@ with torch.no_grad():
     predictions = np.empty((0,1))
     ground_truth = np.empty((0,1))
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(test_loader):
-        actual_subsegmen_nb = int(depth.shape[1] / hyper_params["frame_nb"])
-        depth = depth.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"], depth.shape[2],depth.shape[3]).requires_grad_()
-        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegmen_nb,hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
-        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"],-1).requires_grad_()
-        labels = labels.view(hyper_params["batch_size"], actual_subsegmen_nb, hyper_params["frame_nb"])
+        actual_subsegment_nb = int(depth.shape[1] / hyper_params["frame_nb"])
+        depth = depth.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2],depth.shape[3]).requires_grad_()
+        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegment_nb,hyper_params["frame_nb"], -1).requires_grad_()
+        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
+        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
+        labels = labels.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"])
+
+        depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :]
+        rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
+        rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :]
+        rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :]
+        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
 
         # Initialize hidden state with zeros
         hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
         # Initialize cell state
         cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
 
-        for j in range(actual_subsegmen_nb):
+        for j in range(actual_subsegment_nb):
             inputA = depth[:,j,:,:,:].cuda()
-            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:], rel_goaly[:,j,:,:]], -1).cuda()
+            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:]+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:]+eps)], -1).cuda()
             input = [inputA, inputB]
             label = labels[:,j,:].cuda()
 
@@ -238,8 +262,8 @@ with torch.no_grad():
             meanLoss += loss.cpu().detach().numpy()
             _, predicted = torch.max(outputs.data, 2)
 
-            predictions = np.append(predictions,predicted.cpu().detach().numpy())
-            ground_truth = np.append(ground_truth,labels.cpu().detach().numpy())
+            predictions = np.append(predictions,predicted.view(-1).cpu().detach().numpy())
+            ground_truth = np.append(ground_truth,label.view(-1).cpu().detach().numpy())
 
             total += len(label.view(-1))
             correct += (predicted.view(-1) == label.view(-1)).sum().item()
@@ -248,7 +272,12 @@ with torch.no_grad():
     test_acc = 100 * correct / total
     print('Test Accuracy : {} %, Loss : {:.4f}'.format(test_acc, meanLoss / len(test_loader)))
 
+# Logging reults
+experiment.log_metric("test_loss", meanLoss / len(test_loader), step=epoch)
+experiment.log_metric("test_accuracy", acc, step=epoch)
 
+# plotting graphs (not needed if using comet ml)
+plt.figure()
 x = np.linspace(0,hyper_params["num_epochs"],hyper_params["num_epochs"])
 plt.subplot(1,2,1)
 plt.plot(x,trainLoss)
@@ -259,8 +288,13 @@ plt.plot(x,validAcc)
 # plt.savefig(path+'/learning_curve.png')
 # plt.show()
 
-experiment.log_metric("test_loss", meanLoss / len(test_loader), step=epoch)
-experiment.log_metric("test_accuracy", acc, step=epoch)
+# Plotting confusion matrix
+plt.figure()
+cm = confusion_matrix(ground_truth,predictions)
+plot_confusion_matrix(cm.astype(np.int64), classes=["None", "w", "q", "e", "w+q", "w+e"], path=".")
+
+experiment.log_image("./confusion_matrix.png")
+
 
 dict = {
     "test_acc" : test_acc
