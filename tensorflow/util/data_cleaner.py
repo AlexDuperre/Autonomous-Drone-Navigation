@@ -40,83 +40,83 @@ def replace_keys_parallel(GT):
     GT = GT.decode()
     # print(GT)
 
-    # items = GT.split("+")
-    #
-    # # Clear all other keys
-    # possible_keys = ["q", "w", "e", "None"]
-    #
-    # res = [word in possible_keys for word in items]
-    #
-    # items = list(compress(items, res))
-    #
-    #
-    # # Si q et e en meme temps
-    # # retirer les deux car les deux s'opposeent: aucun mouvement sauf si w est dans la combinaison
-    # possible_keys = ["q", "e"]
-    #
-    # # finds if q or e are present
-    # res = [word in possible_keys for word in items]
-    #
-    # if sum(res)==2:
-    #     # Flip boolean values to pop them out
-    #     res = [not i for i in res]
-    #
-    #     # Pop the q and e
-    #     items = list(compress(items, res))
-    #
-    #
-    # # Insert None if list is empty
-    # if not items:
-    #     items = ["None"]
-    #
-    #
-    # # class 0 : None
-    # possible_keys = ["None"]
-    #
-    # res = [word in possible_keys for word in items]
-    #
-    # if all(res):
-    #     GT = 0
-    #
-    # # class 1  : w
-    # possible_keys = ["w"]
-    #
-    # res = [word in possible_keys for word in items]
-    #
-    # if all(res):
-    #     GT = 1
-    #
-    # # class 2  : q
-    # possible_keys = ["q"]
-    #
-    # res = [word in possible_keys for word in items]
-    #
-    # if all(res):
-    #     GT = 2
-    #
-    # # class 3  : e
-    # possible_keys = ["e"]
-    #
-    # res = [word in possible_keys for word in items]
-    #
-    # if all(res):
-    #     GT = 3
-    #
-    # # class 4  : w+q
-    # possible_keys = ["w", "q"]
-    #
-    # res = [word in possible_keys for word in items]
-    #
-    # if all(res) & (len(res) > 1):
-    #     GT = 4
-    #
-    # # class 5  : w+e
-    # possible_keys = ["w", "e"]
-    #
-    # res = [word in possible_keys for word in items]
-    #
-    # if all(res) & (len(res) > 1):
-    #     GT = 5
+    items = GT.split("+")
+
+    # Clear all other keys
+    possible_keys = ["q", "w", "e", "None"]
+
+    res = [word in possible_keys for word in items]
+
+    items = list(compress(items, res))
+
+
+    # Si q et e en meme temps
+    # retirer les deux car les deux s'opposeent: aucun mouvement sauf si w est dans la combinaison
+    possible_keys = ["q", "e"]
+
+    # finds if q or e are present
+    res = [word in possible_keys for word in items]
+
+    if sum(res)==2:
+        # Flip boolean values to pop them out
+        res = [not i for i in res]
+
+        # Pop the q and e
+        items = list(compress(items, res))
+
+
+    # Insert None if list is empty
+    if not items:
+        items = ["None"]
+
+
+    # class 0 : None
+    possible_keys = ["None"]
+
+    res = [word in possible_keys for word in items]
+
+    if all(res):
+        GT = 0
+
+    # class 1  : w
+    possible_keys = ["w"]
+
+    res = [word in possible_keys for word in items]
+
+    if all(res):
+        GT = 1
+
+    # class 2  : q
+    possible_keys = ["q"]
+
+    res = [word in possible_keys for word in items]
+
+    if all(res):
+        GT = 2
+
+    # class 3  : e
+    possible_keys = ["e"]
+
+    res = [word in possible_keys for word in items]
+
+    if all(res):
+        GT = 3
+
+    # class 4  : w+q
+    possible_keys = ["w", "q"]
+
+    res = [word in possible_keys for word in items]
+
+    if all(res) & (len(res) > 1):
+        GT = 4
+
+    # class 5  : w+e
+    possible_keys = ["w", "e"]
+
+    res = [word in possible_keys for word in items]
+
+    if all(res) & (len(res) > 1):
+        GT = 5
 
     # Add one to the class counter
     # counter.add(GT)
@@ -157,17 +157,17 @@ def fun(idx, h5pyData):
     GT = h5pyData["GT"][idx]
     data["GT"] = replace_keys_parallel( GT)
 
-    # # rescale & normalize video
-    # image = h5pyData["video"][idx][0]
-    # data["video"] = rescale_video(image)
+    # rescale & normalize video
+    image = h5pyData["video"][idx][0]
+    data["video"] = rescale_video(image)
 
     # Normalize depth
     depth = h5pyData["depth"][idx]
     data["depth"] = rescale_depth(depth)
 
-    # # fix and normalize the rel_orientation angle
-    # rel_orientation = h5pyData["rel_orientation"][idx]
-    # data["rel_orientation"] = fix_angle(rel_orientation)
+    # fix and normalize the rel_orientation angle
+    rel_orientation = h5pyData["rel_orientation"][idx]
+    data["rel_orientation"] = fix_angle(rel_orientation)
 
     return data
 
@@ -237,23 +237,22 @@ def main(file_path):
         counter.add(count)
         counter.save_data()
 
-        # # Resize raw video
-        # f["video"].resize((length,1,192,320,3))
-        #
-        # # Resize data array to (length,1,192,320,3)
-        # data["video"] = np.expand_dims(data["video"], axis=1)
+        # Resize raw video
+        f["video"].resize((length,1,192,320,3))
+
+        # Resize data array to (length,1,192,320,3)
+        data["video"] = np.expand_dims(data["video"], axis=1)
 
         # Resize depth
         f["depth"].resize((length, 192, 320))
 
-        # Resize data array to (length,1,192,320,3)
-        # data["depth"] = np.expand_dims(data["depth"], axis=1)
+
 
         # Rewrite new data
-        # f["GT"][:] = data["GT"]
-        # f["video"][:] = data["video"]
+        f["GT"][:] = data["GT"]
+        f["video"][:] = data["video"]
         f["depth"][:] = data["depth"]
-        # f["rel_orientation"][:] = data["rel_orientation"]
+        f["rel_orientation"][:] = data["rel_orientation"]
 
 
 

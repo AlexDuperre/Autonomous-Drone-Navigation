@@ -17,19 +17,19 @@ from GPUtil import showUtilization as gpu_usage
 hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
-    "batch_size" : 1,
+    "batch_size" : 32,
     "learning_rate" : 0.0001,
     "specific_lr" : 0.001,
     "num_epochs" : 15,
-    "input_dim" : 4227,
-    "hidden_dim" : 1000,
+    "input_dim" : 9,
+    "hidden_dim" : 100,
     "layer_dim" : 1,
     "output_dim" : 6,
-    "frame_nb" : 90,
-    "sub_segment_nb": 5,
+    "frame_nb" : 130,
+    "sub_segment_nb": 1,
     "segment_overlap": 0,
-    "patience" : 7,
-    "skip_frames" : 3
+    "patience" : 10,
+    "skip_frames" : 1
 }
 
 
@@ -42,7 +42,7 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("/media/aldupd/UNTITLED 2/dataset", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 print("Dataset length: ", dataset.__len__())
 
 
@@ -88,8 +88,10 @@ model = LSTMModel(input_dim=hyper_params["input_dim"],
 model = model.cuda()
 
 # LOSS
-criterion = nn.CrossEntropyLoss(weight=torch.Tensor([3.2046819111, 1, 5.9049048165, 5.4645210478, 15.7675989943, 15.4961006872]).cuda())
-# criterion = FocalLoss(gamma=4)
+#criterion = nn.CrossEntropyLoss(weight=torch.Tensor([3.2046819111, 1, 5.9049048165, 5.4645210478, 15.7675989943, 15.4961006872]).cuda())
+criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]).cuda())
+# criterion = FocalLoss(gamma=5)
+# criterion = nn.CrossEntropyLoss()
 # optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
 #                               {"params": model.densenet.classifier.parameters()},
 #                               {"params": model.lstm.parameters()},
@@ -114,30 +116,31 @@ for epoch in range(hyper_params["num_epochs"]):
     print("############## Epoch {} ###############".format(epoch+1))
     meanLoss = 0
     sub_segment_nb = 0
+    batch_step = 0
     model.train()
     outputs = []
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(train_loader):
         actual_subsegment_nb = int(depth.shape[1]/hyper_params["frame_nb"])
-        depth = depth.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2], depth.shape[3])
-        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], -1)
-        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], -1)
-        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], -1)
-        labels = labels.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"])
+        depth = depth.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2], depth.shape[3])
+        rel_orientation = rel_orientation.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+        rel_goalx = rel_goalx.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+        rel_goaly = rel_goaly.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+        labels = labels.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"])
 
         depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :].requires_grad_()
         rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
-        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]].requires_grad_()
+        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
 
         # Initialize hidden state with zeros
-        hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).requires_grad_().cuda()
+        hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).requires_grad_().cuda()
         # Initialize cell state
-        cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).requires_grad_().cuda()
+        cn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).requires_grad_().cuda()
 
         for j in range(actual_subsegment_nb):
             inputA = depth[:,j,:,:,:].cuda()
-            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:]+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:]+eps)], -1).cuda()
+            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps)], -1).cuda()
             input = [inputA, inputB]
             label = labels[:,j,:].cuda()
 
@@ -156,17 +159,15 @@ for epoch in range(hyper_params["num_epochs"]):
             sub_segment_nb += 1
             experiment.log_metric("train_batch_loss", loss.item(), step=step+sub_segment_nb)
 
-        step += sub_segment_nb
-
 
         if (i + 1) % 15 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                   .format(epoch + 1, hyper_params["num_epochs"], i + 1, total_step, loss.item()))
 
-
+    step += sub_segment_nb
     # Append mean loss fo graphing and apply lr scheduler
     trainLoss.append(meanLoss / (i + 1))
-    experiment.log_metric("train_epoch_loss", meanLoss / step , step=epoch)
+    experiment.log_metric("train_epoch_loss", meanLoss / sub_segment_nb , step=epoch)
 
 
     # Validation of the model
@@ -179,11 +180,12 @@ for epoch in range(hyper_params["num_epochs"]):
         meanLoss = 0
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(valid_loader):
             actual_subsegment_nb = int(depth.shape[1] / hyper_params["frame_nb"])
-            depth = depth.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],depth.shape[2], depth.shape[3]).requires_grad_()
-            rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegment_nb,hyper_params["frame_nb"], -1).requires_grad_()
-            rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
-            rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
-            labels = labels.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"])
+            depth = depth.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2],
+                               depth.shape[3])
+            rel_orientation = rel_orientation.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+            rel_goalx = rel_goalx.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+            rel_goaly = rel_goaly.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+            labels = labels.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"])
 
             depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :]
             rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
@@ -192,13 +194,17 @@ for epoch in range(hyper_params["num_epochs"]):
             labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
 
             # Initialize hidden state with zeros
-            hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+            hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
             # Initialize cell state
-            cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+            cn = torch.zeros(hyper_params["layer_dim"], depth.shape[0],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
 
             for j in range(actual_subsegment_nb):
                 inputA = depth[:, j, :, :, :].cuda()
-                inputB = torch.cat([rel_orientation[:, j, :, :], rel_goalx[:, j, :, :] / (rel_goalx[:, 0, 0, :] + eps), rel_goaly[:, j, :, :] / (rel_goaly[:, 0, 0, :] + eps)], -1).cuda()
+                inputB = torch.cat([rel_orientation[:, j, :, :], rel_goalx[:, j, :, :] / (
+                            rel_goalx[:, 0, 0, :].unsqueeze(1).repeat(1, depth.shape[2], 1) + eps),
+                                   rel_goaly[:, j, :, :] / (
+                                               rel_goaly[:, 0, 0, :].unsqueeze(1).repeat(1, depth.shape[2], 1) + eps)],
+                                  -1).cuda()
                 input = [inputA, inputB]
                 label = labels[:, j, :].cuda()
 
@@ -240,11 +246,12 @@ with torch.no_grad():
     ground_truth = np.empty((0,1))
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(test_loader):
         actual_subsegment_nb = int(depth.shape[1] / hyper_params["frame_nb"])
-        depth = depth.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2],depth.shape[3]).requires_grad_()
-        rel_orientation = rel_orientation.view(hyper_params["batch_size"], actual_subsegment_nb,hyper_params["frame_nb"], -1).requires_grad_()
-        rel_goalx = rel_goalx.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
-        rel_goaly = rel_goaly.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"],-1).requires_grad_()
-        labels = labels.view(hyper_params["batch_size"], actual_subsegment_nb, hyper_params["frame_nb"])
+        depth = depth.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2],
+                           depth.shape[3])
+        rel_orientation = rel_orientation.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+        rel_goalx = rel_goalx.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+        rel_goaly = rel_goaly.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
+        labels = labels.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"])
 
         depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :]
         rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
@@ -253,14 +260,15 @@ with torch.no_grad():
         labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
 
         # Initialize hidden state with zeros
-        hn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+        hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
         # Initialize cell state
-        cn = torch.zeros(hyper_params["layer_dim"], hyper_params["batch_size"], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
+        cn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
 
         for j in range(actual_subsegment_nb):
             inputA = depth[:,j,:,:,:].cuda()
-            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:]+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:]+eps)], -1).cuda()
+            inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps)], -1).cuda()
             input = [inputA, inputB]
+
             label = labels[:,j,:].cuda()
 
             # Forward pass

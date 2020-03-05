@@ -4,7 +4,7 @@ import torch.nn as nn
 from GPUtil import showUtilization as gpu_usage
 
 class LSTMModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, layer_dim, output_dim):
+    def __init__(self, input_dim, hidden_dim, layer_dim, output_dim, Pretrained=False):
         super(LSTMModel, self).__init__()
 
         ############################################
@@ -16,6 +16,9 @@ class LSTMModel(nn.Module):
         # self.densenet.classifier = nn.Linear(1920, input_dim-3)
 
         self.densenet = ResCNN()
+        if Pretrained:
+            state_dict = torch.load('model.ckpt')
+            self.densenet.load_state_dict((state_dict))
 
 
         ############################################
@@ -96,6 +99,10 @@ class ResCNN(nn.Module):
         self.relu5 = nn.ReLU()
         self.avgpool = nn.AvgPool2d(3)
 
+        self.fc1 = nn.Linear(960, 6)
+        self.fc2 =  nn.Linear(450, 150)
+        self.fc3 = nn.Linear(150, 6)
+
         # Define layers
         self.layer1 = nn.Sequential(
             self.conv1,
@@ -133,4 +140,7 @@ class ResCNN(nn.Module):
         out2 = self.layer2(out1)
         out3 = self.layer3(out1+out2)
         out4 = self.layer4(out2+out3)
-        return out4.view(x.shape [0],-1)
+        out5 = self.fc1(out4.view(x.shape[0], -1))
+        out6 = self.fc2(out5)
+        out7 = self.fc3(out6)
+        return out7

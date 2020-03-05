@@ -12,6 +12,6 @@ from util.MidAirSegmenter import DNDSegmenter
 
 
 data_segmenter = DNDSegmenter("./")
-table = data_segmenter.segment((20,50),1, 10)
+table = data_segmenter.segment((60,),0,1)
 
 print(table[45][0])

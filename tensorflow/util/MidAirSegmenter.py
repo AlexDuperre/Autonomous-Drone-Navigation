@@ -29,11 +29,13 @@ class TrajectorySegmenter:
 
         elif len(sequence_length_range) == 1:
             if sequence_length_range[0]>trajectory_length:
-                start_frames = [0]
-                sequence_lengths = trajectory_length//subsequence_frame_nb[0] * subsequence_frame_nb[0]
-                print(sequence_lengths)
-                if trajectory_length//subsequence_frame_nb[0] == 0:
-                    print("###########sequence too small#############")
+                # start_frames = [0]
+                # sequence_lengths = trajectory_length//subsequence_frame_nb[0] * subsequence_frame_nb[0]
+                # print(sequence_lengths)
+                # if trajectory_length//subsequence_frame_nb[0] == 0:
+                #     print("###########sequence too small#############")
+                dataframe = pd.DataFrame([])
+                print("dropped trajectory, length of: ",trajectory_length)
             else:
                 start_frames = list(
                     range(0, trajectory_length - sequence_length_range[0], sequence_length_range[0] - overlap))
@@ -44,18 +46,18 @@ class TrajectorySegmenter:
 
                 sequence_lengths = [sequence_length_range[0]] * len(start_frames)
 
-                if dropped_frames//subsequence_frame_nb[0] > 0:
-                    start_frames.append(start_frames[-1]+sequence_length_range[0])
-                    sequence_lengths.append(dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0])
-                    dropped_frames -= dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0]
+                # if dropped_frames//subsequence_frame_nb[0] > 0:
+                #     start_frames.append(start_frames[-1]+sequence_length_range[0])
+                #     sequence_lengths.append(dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0])
+                #     dropped_frames -= dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0]
+                #
+                # if dropped_frames > 0:
+                #     print("Last {} frames not used for trajectory {}".format(dropped_frames,
+                #                                                              trajectory))
 
-                if dropped_frames > 0:
-                    print("Last {} frames not used for trajectory {}".format(dropped_frames,
-                                                                             trajectory))
 
-
-            sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
-            dataframe = pd.DataFrame(sequence)
+                sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
+                dataframe = pd.DataFrame(sequence)
             # serialization_destination.create_dataset('trajectory_segments', data=dataframe.to_numpy())
             return dataframe.values.tolist()
 
@@ -99,14 +101,34 @@ class DNDSegmenter(TrajectorySegmenter):
             for name in files:
                 if name.endswith(".h5"):
                     path = os.path.join(root,name).replace('\\','/')
-                    print(path)
                     datasets = h5py.File(path, "r+")
                     trajectory_length = self.__get_trajectory_length__(datasets)
                     segments = self.segment_trajectory(overlap, subsequence_frame_nb, subsequence_nb,
                                                        name, trajectory_length)
-                    segment_list.extend(segments)
-                    path_list.extend(len(segments)*[path])
+                    if segments != []:
+                        segments = self.data_balancer(datasets, segments)
+                        segment_list.extend(segments)
+                        path_list.extend(len(segments)*[path])
         return list(zip(segment_list,path_list))
 
     def __get_trajectory_length__(self, datasets):
             return datasets["GT"].len()
+
+    def data_balancer(self, dataset, segments):
+        new_segments = []
+        for segment in segments:
+
+            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==2):
+                new_segments.extend(3*[segment])
+
+            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==3):
+                new_segments.extend(3*[segment])
+
+            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==4):
+                new_segments.extend(15*[segment])
+
+            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==5):
+                new_segments.extend(15*[segment])
+
+        segments.extend(new_segments)
+        return segments

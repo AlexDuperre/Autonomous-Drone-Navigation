@@ -30,7 +30,7 @@ def display_trajectory(image, rel_goal, rel_orientation):
     return image
 
 def main():
-    filepath = "/tmp/dataset/path_1_21_000.h5"
+    filepath = "/tmp/DATASET/dataset/path_2_9_002.h5"
     f = h5py.File(filepath, "r")
 
     for idx in range(len(f["depth"])):
