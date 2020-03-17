@@ -18,7 +18,7 @@ from util.pytorchtools import EarlyStopping
 
 from sklearn.metrics import confusion_matrix
 from util.confusion_matrix import plot_confusion_matrix
-from GPUtil import showUtilization as gpu_usage
+# from GPUtil import showUtilization as gpu_usage
 
 
 hyper_params = {
@@ -50,7 +50,11 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
+<<<<<<< Updated upstream
 dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+=======
+dataset = DND("C:/aldupd/DND/dataset/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+>>>>>>> Stashed changes
 print("Dataset length: ", dataset.__len__())
 
 
