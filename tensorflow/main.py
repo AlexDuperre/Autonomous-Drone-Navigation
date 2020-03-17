@@ -1,14 +1,21 @@
 from comet_ml import Experiment
 import torch
-from models.dataset import DND
-from models.model import LSTMModel
 import torch.nn as nn
-import numpy as np
-import matplotlib.pyplot as plt
-from util.pytorchtools import EarlyStopping
 import torchvision.transforms as transforms
 from torch.optim import lr_scheduler
+
+from models.dataset import DND
+from models.model import LSTMModel
 from util.focalloss import FocalLoss
+from util.custom_loss import weightedLoss
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+from util.pytorchtools import EarlyStopping
+
+
+
 from sklearn.metrics import confusion_matrix
 from util.confusion_matrix import plot_confusion_matrix
 from GPUtil import showUtilization as gpu_usage
@@ -17,19 +24,20 @@ from GPUtil import showUtilization as gpu_usage
 hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
-    "batch_size" : 32,
-    "learning_rate" : 0.0001,
-    "specific_lr" : 0.001,
-    "num_epochs" : 15,
-    "input_dim" : 9,
-    "hidden_dim" : 100,
+    "batch_size" : 100,
+    "learning_rate" : 0.01,
+    "specific_lr" : 0.00001,
+    "lr_scheduler_step" : 7,
+    "num_epochs" : 25,
+    "input_dim" : 150,
+    "hidden_dim" : 500,
     "layer_dim" : 1,
-    "output_dim" : 6,
-    "frame_nb" : 130,
+    "output_dim" : 5,
+    "frame_nb" : 100,
     "sub_segment_nb": 1,
     "segment_overlap": 0,
     "patience" : 10,
-    "skip_frames" : 1
+    "skip_frames" : 3
 }
 
 
@@ -42,7 +50,7 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 print("Dataset length: ", dataset.__len__())
 
 
@@ -84,14 +92,18 @@ print(len(test_loader))
 model = LSTMModel(input_dim=hyper_params["input_dim"],
                   hidden_dim=hyper_params["hidden_dim"],
                   layer_dim=hyper_params["layer_dim"],
-                  output_dim=hyper_params["output_dim"])
+                  output_dim=hyper_params["output_dim"],
+                  Pretrained=False)
 model = model.cuda()
 
 # LOSS
 #criterion = nn.CrossEntropyLoss(weight=torch.Tensor([3.2046819111, 1, 5.9049048165, 5.4645210478, 15.7675989943, 15.4961006872]).cuda())
-criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]).cuda())
+# criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]).cuda())
 # criterion = FocalLoss(gamma=5)
 # criterion = nn.CrossEntropyLoss()
+criterion = weightedLoss()
+
+# Optimzer
 # optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
 #                               {"params": model.densenet.classifier.parameters()},
 #                               {"params": model.lstm.parameters()},
@@ -100,8 +112,10 @@ criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.0684208353, 0.0213502735,
 optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hyper_params["specific_lr"]},
                               {"params": model.lstm.parameters()},
                               {"params": model.fc.parameters()}],
-                             lr=hyper_params["learning_rate"])
+                             lr=hyper_params["learning_rate"],
+                             weight_decay=0.01)
 
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=hyper_params["lr_scheduler_step"], gamma=0.1)
 
 print("model loaded")
 
@@ -127,7 +141,7 @@ for epoch in range(hyper_params["num_epochs"]):
         rel_goaly = rel_goaly.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
         labels = labels.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"])
 
-        depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :].requires_grad_()
+        depth = depth[:, :, 0:-1:hyper_params["skip_frames"], :, :].requires_grad_() #loses one time step of the segment
         rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
@@ -148,7 +162,8 @@ for epoch in range(hyper_params["num_epochs"]):
             outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
 
-            loss = criterion(outputs.view(-1,6), label.view(-1))
+            # loss = criterion(outputs.view(-1,6), label.view(-1))
+            loss = criterion(outputs, label, inputA)
             meanLoss += loss.cpu().detach().numpy()
 
             # Backward and optimize
@@ -160,7 +175,7 @@ for epoch in range(hyper_params["num_epochs"]):
             experiment.log_metric("train_batch_loss", loss.item(), step=step+sub_segment_nb)
 
 
-        if (i + 1) % 15 == 0:
+        if (i + 1) % 100 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                   .format(epoch + 1, hyper_params["num_epochs"], i + 1, total_step, loss.item()))
 
@@ -211,7 +226,8 @@ for epoch in range(hyper_params["num_epochs"]):
                 # Forward pass
                 outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
-                loss = criterion(outputs.view(-1, 6), label.view(-1))
+                # loss = criterion(outputs.view(-1, 6), label.view(-1))
+                loss = criterion(outputs, label, inputA)
                 meanLoss += loss.cpu().detach().numpy()
                 _, predicted = torch.max(outputs.data, 2)
                 total += len(label.view(-1))
@@ -228,6 +244,9 @@ for epoch in range(hyper_params["num_epochs"]):
         validAcc.append(acc)
         experiment.log_metric("valid_epoch_loss", meanLoss / sub_segment_nb, step=epoch)
         experiment.log_metric("valid_epoch_accuracy", acc, step=epoch)
+
+    # Adjust learning rate
+    exp_lr_scheduler.step()
 
     # Check if we should stop early
     early_stopping(meanLoss / sub_segment_nb, model)
@@ -275,7 +294,8 @@ with torch.no_grad():
             outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
 
-            loss = criterion(outputs.view(-1,6), label.view(-1))
+            # loss = criterion(outputs.view(-1,6), label.view(-1))
+            loss = criterion(outputs, label, inputA)
             meanLoss += loss.cpu().detach().numpy()
 
             _, predicted = torch.max(outputs.data, 2)
@@ -310,7 +330,7 @@ experiment.log_metric("test_accuracy", acc, step=epoch)
 # Plotting confusion matrix
 plt.figure()
 cm = confusion_matrix(ground_truth,predictions)
-plot_confusion_matrix(cm.astype(np.int64), classes=["None", "w", "q", "e", "w+q", "w+e"], path=".")
+plot_confusion_matrix(cm.astype(np.int64), classes=[ "w", "q", "e", "w+q", "w+e"], path=".")
 
 experiment.log_image("./confusion_matrix.png")
 

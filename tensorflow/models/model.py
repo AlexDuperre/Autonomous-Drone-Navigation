@@ -17,12 +17,15 @@ class LSTMModel(nn.Module):
 
         self.densenet = ResCNN()
         if Pretrained:
-            state_dict = torch.load('model.ckpt')
+            state_dict = torch.load('ResCNN_model.pt')
             self.densenet.load_state_dict((state_dict))
 
 
         ############################################
         #LSTM
+
+        # self.fc1 = nn.Linear(6,100)
+        # self.fc2 = nn.Linear(100,1000)
 
         # Hidden dimensions
         self.hidden_dim = hidden_dim
@@ -33,10 +36,22 @@ class LSTMModel(nn.Module):
         # Building your LSTM
         # batch_first=True causes input/output tensors to be of shape
         # (batch_dim, seq_dim, feature_dim)
-        self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=False)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=True)
 
         # Readout layer
-        self.fc = nn.Linear(hidden_dim, output_dim)
+        self.fc1 = nn.Linear(hidden_dim, 250)
+        # self.bn1 = nn.BatchNorm1d(250)
+        self.relu1 = nn.ReLU()
+        self.fc2 = nn.Linear(250, output_dim)
+        self.dropout = nn.Dropout()
+
+        self.fc = nn.Sequential(
+            self.fc1,
+            # self.bn1,
+            self.dropout,
+            self.fc2,
+
+        )
 
     def forward(self, x, hn, cn):
         batch_size, seq_length, height, width = x[0].shape
@@ -48,7 +63,11 @@ class LSTMModel(nn.Module):
 
         # Concatenate features together
         featuresB = x[1]
-        Features = torch.cat([featuresA, featuresB.type(torch.float)], dim=2)
+        Features = featuresA #torch.cat([featuresA, featuresB.type(torch.float)], dim=2)
+
+        # Representation of the input
+        # out = self.fc1(Features)
+        # out = self.fc2(out)
 
         # Initialize hidden state with zeros
         # h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
@@ -59,12 +78,13 @@ class LSTMModel(nn.Module):
         # One time step
         # We need to detach as we are doing truncated backpropagation through time (BPTT)
         # If we don't, we'll backprop all the way to the start even after going through another batch
-        out, (hn, cn) = self.lstm(Features.permute(1,0,2), (hn, cn))
+        out, (hn, cn) = self.lstm(Features, (hn, cn))
 
         # Index hidden state of last time step
         # out.size() --> 100, 28, 100
         # out[:, -1, :] --> 100, 100 --> just want last time step hidden states!
         out = self.fc(out)
+
         # out.size() --> 100, 10
         return out, (hn, cn)
 
@@ -99,9 +119,9 @@ class ResCNN(nn.Module):
         self.relu5 = nn.ReLU()
         self.avgpool = nn.AvgPool2d(3)
 
-        self.fc1 = nn.Linear(960, 6)
+        self.fc1 = nn.Linear(960, 450)
         self.fc2 =  nn.Linear(450, 150)
-        self.fc3 = nn.Linear(150, 6)
+        # self.fc3 = nn.Linear(150, 6)
 
         # Define layers
         self.layer1 = nn.Sequential(
@@ -142,5 +162,5 @@ class ResCNN(nn.Module):
         out4 = self.layer4(out2+out3)
         out5 = self.fc1(out4.view(x.shape[0], -1))
         out6 = self.fc2(out5)
-        out7 = self.fc3(out6)
-        return out7
+        # out7 = self.fc3(out6)
+        return out6

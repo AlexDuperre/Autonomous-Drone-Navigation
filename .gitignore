@@ -22,3 +22,7 @@ tensorflow/dataset/RAW DATASET/
 *.pt
 
 tensorflow/confusion_matrix.png
+
+tensorflow/dataset/Smaller depth None free/*
+
+tensorflow/dataset/Smaller depth/*

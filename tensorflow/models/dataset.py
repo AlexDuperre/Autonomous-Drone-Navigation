@@ -7,6 +7,7 @@ import numpy as np
 import h5py
 import cv2
 from matplotlib.pylab import cm
+import random
 
 from util.MidAirSegmenter import DNDSegmenter
 
@@ -14,6 +15,8 @@ class DND(Dataset):
     def __init__(self, data_dir, transform = None, frames_nb=30, subsegment_nb=1, overlap=20):
         data_segmenter = DNDSegmenter(data_dir)
         self.Table = data_segmenter.segment((frames_nb,), overlap,subsegment_nb)
+        self.Table = random.shuffle(self.Table)
+        self.Table = self.Table[0:int(len(self.Table)*0.02)]
 
         self.transform = transform
 
@@ -58,7 +61,7 @@ class DND(Dataset):
         # if self.transform:
         #     image = self.transform(image)
 
-        return (depth, rel_orientation, rel_goalx, rel_goaly, GT.astype(int))
+        return (depth, rel_orientation, rel_goalx, rel_goaly, GT.astype(int)-1)
 
     def __len__(self):
         return len(self.Table)

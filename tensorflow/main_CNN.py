@@ -18,11 +18,13 @@ hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
     "batch_size" : 1,
-    "learning_rate" : 0.0001,
+    "learning_rate" : 0.01,
+    "lr_scheduler_step" : 4,
     "num_epochs" : 15,
-    "frame_nb" : 130,
+    "frame_nb" : 100,
+    "sub_segment_nb": 1,
     "segment_overlap": 0,
-    "patience" : 10,
+    "patience" : 14,
 }
 
 
@@ -82,13 +84,10 @@ model = model.cuda()
 criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]).cuda())
 # criterion = FocalLoss(gamma=5)
 # criterion = nn.CrossEntropyLoss()
-# optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
-#                               {"params": model.densenet.classifier.parameters()},
-#                               {"params": model.lstm.parameters()},
-#                               {"params": model.fc.parameters()}],
-#                              lr=hyper_params["learning_rate"])
+
 optimizer = torch.optim.Adam(model.parameters(), lr=hyper_params["learning_rate"])
 
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=hyper_params["lr_scheduler_step"], gamma=0.1)
 
 print("model loaded")
 
@@ -106,12 +105,13 @@ for epoch in range(hyper_params["num_epochs"]):
     model.train()
     outputs = []
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(train_loader):
-        depth = depth.view(depth.shape[0]* hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).cuda()
-        labels = labels.view(depth.shape[0]* hyper_params["frame_nb"]).cuda()
+        batch, frame_nb, _, _ = depth.shape
+        depth = depth.view(batch * frame_nb, depth.shape[2], depth.shape[3]).unsqueeze(1).cuda()
+        labels = labels.view(batch * frame_nb,).cuda()
 
 
         # Forward pass
-        outputs, = model(depth)
+        outputs = model(depth)
 
 
         loss = criterion(outputs.view(-1,6), labels.view(-1))
@@ -125,7 +125,7 @@ for epoch in range(hyper_params["num_epochs"]):
         experiment.log_metric("train_batch_loss", loss.item(), step=step+i+1)
 
 
-        if (i + 1) % 15 == 0:
+        if (i + 1) % 1000 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                   .format(epoch + 1, hyper_params["num_epochs"], i + 1, total_step, loss.item()))
 
@@ -143,8 +143,9 @@ for epoch in range(hyper_params["num_epochs"]):
         total = 0
         meanLoss = 0
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(valid_loader):
-            depth = depth.view(depth.shape[0] * hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).cuda()
-            labels = labels.view(depth.shape[0] * hyper_params["frame_nb"]).cuda()
+            batch, frame_nb, _, _ = depth.shape
+            depth = depth.view(batch * frame_nb, depth.shape[2], depth.shape[3]).unsqueeze(1).cuda()
+            labels = labels.view(batch * frame_nb, ).cuda()
 
 
             # Forward pass
@@ -152,7 +153,7 @@ for epoch in range(hyper_params["num_epochs"]):
 
             loss = criterion(outputs.view(-1, 6), labels.view(-1))
             meanLoss += loss.cpu().detach().numpy()
-            _, predicted = torch.max(outputs.data, 2)
+            _, predicted = torch.max(outputs.data, 1)
             total += len(labels.view(-1))
             correct += (predicted.view(-1) == labels.view(-1)).sum().item()
 
@@ -167,6 +168,9 @@ for epoch in range(hyper_params["num_epochs"]):
         validAcc.append(acc)
         experiment.log_metric("valid_epoch_loss", meanLoss / (i+1), step=epoch)
         experiment.log_metric("valid_epoch_accuracy", acc, step=epoch)
+
+    # Adjust learning rate
+    exp_lr_scheduler.step()
 
     # Check if we should stop early
     early_stopping(meanLoss / (i+1), model)
@@ -183,8 +187,9 @@ with torch.no_grad():
     predictions = np.empty((0,1))
     ground_truth = np.empty((0,1))
     for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(test_loader):
-        depth = depth.view(depth.shape[0] * hyper_params["frame_nb"], depth.shape[2], depth.shape[3]).cuda()
-        labels = labels.view(depth.shape[0] * hyper_params["frame_nb"]).cuda()
+        batch, frame_nb, _, _ = depth.shape
+        depth = depth.view(batch * frame_nb, depth.shape[2], depth.shape[3]).unsqueeze(1).cuda()
+        labels = labels.view(batch * frame_nb, ).cuda()
 
         # Forward pass
         outputs = model(depth)
@@ -193,7 +198,7 @@ with torch.no_grad():
         loss = criterion(outputs.view(-1,6), labels.view(-1))
         meanLoss += loss.cpu().detach().numpy()
 
-        _, predicted = torch.max(outputs.data, 2)
+        _, predicted = torch.max(outputs.data, 1)
 
         predictions = np.append(predictions,predicted.view(-1).cpu().detach().numpy())
         ground_truth = np.append(ground_truth,labels.view(-1).cpu().detach().numpy())

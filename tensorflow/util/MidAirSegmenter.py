@@ -119,10 +119,10 @@ class DNDSegmenter(TrajectorySegmenter):
         for segment in segments:
 
             if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==2):
-                new_segments.extend(3*[segment])
+                new_segments.extend(2*[segment])
 
             if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==3):
-                new_segments.extend(3*[segment])
+                new_segments.extend(2*[segment])
 
             if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==4):
                 new_segments.extend(15*[segment])
