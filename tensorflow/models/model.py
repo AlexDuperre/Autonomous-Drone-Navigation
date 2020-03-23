@@ -120,7 +120,7 @@ class ResCNN(nn.Module):
         self.avgpool = nn.AvgPool2d(3)
 
         self.fc1 = nn.Linear(960, 450)
-        self.fc2 =  nn.Linear(450, 150)
+        self.fc2 =  nn.Linear(450, 450)
         # self.fc3 = nn.Linear(150, 6)
 
         # Define layers

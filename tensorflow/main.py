@@ -26,11 +26,11 @@ hyper_params = {
     "validationTestRatio" : 0.5,
     "batch_size" : 100,
     "learning_rate" : 0.01,
-    "specific_lr" : 0.00001,
-    "lr_scheduler_step" : 7,
-    "num_epochs" : 25,
-    "input_dim" : 150,
-    "hidden_dim" : 500,
+    "specific_lr" : 0.001,
+    "lr_scheduler_step" : 12,
+    "num_epochs" : 45,
+    "input_dim" : 450,
+    "hidden_dim" : 1000,
     "layer_dim" : 1,
     "output_dim" : 5,
     "frame_nb" : 100,
@@ -50,11 +50,9 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-<<<<<<< Updated upstream
-dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
-=======
-dataset = DND("C:/aldupd/DND/dataset/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
->>>>>>> Stashed changes
+
+dataset = DND("C:/aldupd/DND/Smaller depth None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+
 print("Dataset length: ", dataset.__len__())
 
 
@@ -149,7 +147,7 @@ for epoch in range(hyper_params["num_epochs"]):
         rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
-        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
+        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]].long()
 
         # Initialize hidden state with zeros
         hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).requires_grad_().cuda()
@@ -210,7 +208,7 @@ for epoch in range(hyper_params["num_epochs"]):
             rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
             rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :]
             rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :]
-            labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
+            labels = labels[:, :, 0:-1:hyper_params["skip_frames"]].long()
 
             # Initialize hidden state with zeros
             hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
@@ -250,7 +248,8 @@ for epoch in range(hyper_params["num_epochs"]):
         experiment.log_metric("valid_epoch_accuracy", acc, step=epoch)
 
     # Adjust learning rate
-    exp_lr_scheduler.step()
+    if epoch < 20:
+        exp_lr_scheduler.step()
 
     # Check if we should stop early
     early_stopping(meanLoss / sub_segment_nb, model)
@@ -280,7 +279,7 @@ with torch.no_grad():
         rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
         rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :]
         rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :]
-        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
+        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]].long()
 
         # Initialize hidden state with zeros
         hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
