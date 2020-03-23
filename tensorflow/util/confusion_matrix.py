@@ -35,4 +35,4 @@ def plot_confusion_matrix(cm, classes, path,
     plt.xlabel('Predicted label')
     plt.grid(False)
     plt.savefig(path + "/confusion_matrix.png")
-    plt.show()
+    plt.show(block=False)

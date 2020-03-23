@@ -18,7 +18,7 @@ class LSTMModel(nn.Module):
         self.densenet = ResCNN()
         if Pretrained:
             state_dict = torch.load('ResCNN_model.pt')
-            self.densenet.load_state_dict((state_dict))
+            self.densenet.load_state_dict(state_dict)
 
 
         ############################################
@@ -93,33 +93,25 @@ class ResCNN(nn.Module):
     def __init__(self):
         super(ResCNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(1,64,7,3)
-        self.batchNorm1 = nn.BatchNorm2d(64)
+        self.conv1 = nn.Conv2d(1,32, 5)
+        self.batchNorm1 = nn.BatchNorm2d(32)
         self.relu1 = nn.ReLU()
-        self.maxpool = nn.MaxPool2d(3)
+        self.avgpool1 = nn.AvgPool2d(2)
 
 
-        self.conv2 = nn.Conv2d(64, 64, 3, 1, 1)
+        self.conv2 = nn.Conv2d(32, 64,5)
         self.batchNorm2 = nn.BatchNorm2d(64)
         self.relu2 = nn.ReLU()
 
 
-        self.conv3 = nn.Conv2d(64, 64, 3, 1, 1)
-        self.batchNorm3 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 128, 3)
+        self.batchNorm3 = nn.BatchNorm2d(128)
         self.relu3 = nn.ReLU()
+        self.avgpool2 = nn.AvgPool2d(2)
 
 
-        self.conv4 = nn.Conv2d(64, 64, 3, 1, 1)
-        self.batchNorm4 = nn.BatchNorm2d(64)
+        self.fc1 = nn.Linear(92160, 450)
         self.relu4 = nn.ReLU()
-
-
-        self.conv5 = nn.Conv2d(64, 64, 3, 1, 1)
-        self.batchNorm5 = nn.BatchNorm2d(64)
-        self.relu5 = nn.ReLU()
-        self.avgpool = nn.AvgPool2d(3)
-
-        self.fc1 = nn.Linear(960, 450)
         self.fc2 =  nn.Linear(450, 150)
         # self.fc3 = nn.Linear(150, 6)
 
@@ -128,39 +120,128 @@ class ResCNN(nn.Module):
             self.conv1,
             self.batchNorm1,
             self.relu1,
-            self.maxpool
+            self.avgpool1
         )
 
         self.layer2 = nn.Sequential(
             self.conv2,
             self.batchNorm2,
-            self.relu2,
-            self.conv3,
-            self.batchNorm3
+            self.relu2
         )
 
         self.layer3 = nn.Sequential(
+            self.conv3,
+            self.batchNorm3,
             self.relu3,
-            self.conv4,
-            self.batchNorm4,
-            self.relu4,
-            self.conv5,
-            self.batchNorm5
+            self.avgpool2
         )
 
         self.layer4 = nn.Sequential(
-            self.relu5,
-            self.avgpool
-
+            Squeeze(),
+            self.fc1,
+            self.relu4,
+            self.fc2
         )
 
     def forward(self,x):
 
         out1 = self.layer1(x)
         out2 = self.layer2(out1)
-        out3 = self.layer3(out1+out2)
-        out4 = self.layer4(out2+out3)
-        out5 = self.fc1(out4.view(x.shape[0], -1))
-        out6 = self.fc2(out5)
-        # out7 = self.fc3(out6)
-        return out6
+        out3 = self.layer3(out2)
+        out4 = self.layer4(out3)
+
+        return out4
+
+class Squeeze(nn.Module):
+    def __init__(self, *args):
+        super(Squeeze, self).__init__()
+        self.shape = args
+
+    def forward(self, x):
+        return x.view(x.shape[0], -1)
+
+
+class Unsqueeze(nn.Module):
+    def __init__(self, *args):
+        super(Unsqueeze, self).__init__()
+        self.shape = args
+
+    def forward(self, x):
+        return x.view(x.shape[0], 128, 20, 36)
+
+
+class ResCNNDecoder(nn.Module):
+    def __init__(self):
+        super(ResCNNDecoder, self).__init__()
+
+
+        self.fc1 = nn.Linear(150, 450)
+        self.relu1 = nn.ReLU()
+        self.fc2 =  nn.Linear(450, 92160)
+        self.relu2 = nn.ReLU()
+
+
+        self.conv1 = nn.Conv2d(128, 64, 3, 1, 3)
+        self.batchNorm1 = nn.BatchNorm2d(64)
+        self.relu3 = nn.ReLU()
+        self.upsampling1 = nn.UpsamplingBilinear2d(scale_factor=2)
+
+        self.conv2 = nn.Conv2d(64, 32, 5, 1, 1)
+        self.batchNorm2 = nn.BatchNorm2d(32)
+        self.relu4 = nn.ReLU()
+
+        self.conv3 = nn.Conv2d(32, 1, 5, 1, 3)
+        self.batchNorm3 = nn.BatchNorm2d(1)
+        self.relu5 = nn.ReLU()
+        self.upsampling3 = nn.UpsamplingBilinear2d(scale_factor=2)
+
+
+        # Define layers
+        self.layer1 = nn.Sequential(
+            self.fc1,
+            self.relu1,
+            self.fc2,
+            self.relu2,
+            Unsqueeze()
+        )
+
+        self.layer2 = nn.Sequential(
+            self.conv1,
+            self.batchNorm1,
+            self.relu3,
+            self.upsampling1
+        )
+
+        self.layer3 = nn.Sequential(
+            self.conv2,
+            self.batchNorm2,
+            self.relu4
+        )
+
+        self.layer4 = nn.Sequential(
+            self.conv3,
+            self.batchNorm3,
+            self.relu5,
+            self.upsampling3
+        )
+
+    def forward(self, x):
+        out1 = self.layer1(x)
+        out2 = self.layer2(out1)
+        out3 = self.layer3(out2)
+        out4 = self.layer4(out3)
+
+        return out4
+
+
+class AutoEncoder(nn.Module):
+    def __init__(self):
+        super(AutoEncoder,self).__init__()
+        self.Encoder = ResCNN()
+        self.Decoder = ResCNNDecoder()
+
+    def forward(self, x):
+        out = self.Encoder(x)
+        x = self.Decoder(out)
+
+        return x
