@@ -93,26 +93,26 @@ class ResCNN(nn.Module):
     def __init__(self):
         super(ResCNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(1,32, 5)
-        self.batchNorm1 = nn.BatchNorm2d(32)
+        self.conv1 = nn.Conv2d(1,16, 5)
+        self.batchNorm1 = nn.BatchNorm2d(16)
         self.relu1 = nn.ReLU()
         self.avgpool1 = nn.AvgPool2d(2)
 
 
-        self.conv2 = nn.Conv2d(32, 64,5)
-        self.batchNorm2 = nn.BatchNorm2d(64)
+        self.conv2 = nn.Conv2d(16, 32,5)
+        self.batchNorm2 = nn.BatchNorm2d(32)
         self.relu2 = nn.ReLU()
 
 
-        self.conv3 = nn.Conv2d(64, 128, 3)
-        self.batchNorm3 = nn.BatchNorm2d(128)
+        self.conv3 = nn.Conv2d(32, 32, 3)
+        self.batchNorm3 = nn.BatchNorm2d(32)
         self.relu3 = nn.ReLU()
         self.avgpool2 = nn.AvgPool2d(2)
 
 
-        self.fc1 = nn.Linear(92160, 450)
+        self.fc1 = nn.Linear(23040, 5000)
         self.relu4 = nn.ReLU()
-        self.fc2 =  nn.Linear(450, 150)
+        self.fc2 =  nn.Linear(5000, 450)
         # self.fc3 = nn.Linear(150, 6)
 
         # Define layers
@@ -167,7 +167,7 @@ class Unsqueeze(nn.Module):
         self.shape = args
 
     def forward(self, x):
-        return x.view(x.shape[0], 128, 20, 36)
+        return x.view(x.shape[0], 32, 20, 36)
 
 
 class ResCNNDecoder(nn.Module):
@@ -175,22 +175,22 @@ class ResCNNDecoder(nn.Module):
         super(ResCNNDecoder, self).__init__()
 
 
-        self.fc1 = nn.Linear(150, 450)
+        self.fc1 = nn.Linear(450, 5000)
         self.relu1 = nn.ReLU()
-        self.fc2 =  nn.Linear(450, 92160)
+        self.fc2 =  nn.Linear(5000, 23040)
         self.relu2 = nn.ReLU()
 
 
-        self.conv1 = nn.Conv2d(128, 64, 3, 1, 3)
-        self.batchNorm1 = nn.BatchNorm2d(64)
+        self.conv1 = nn.Conv2d(32, 32, 3, 1, 3)
+        self.batchNorm1 = nn.BatchNorm2d(32)
         self.relu3 = nn.ReLU()
         self.upsampling1 = nn.UpsamplingBilinear2d(scale_factor=2)
 
-        self.conv2 = nn.Conv2d(64, 32, 5, 1, 1)
-        self.batchNorm2 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 16, 5, 1, 1)
+        self.batchNorm2 = nn.BatchNorm2d(16)
         self.relu4 = nn.ReLU()
 
-        self.conv3 = nn.Conv2d(32, 1, 5, 1, 3)
+        self.conv3 = nn.Conv2d(16, 1, 5, 1, 3)
         self.batchNorm3 = nn.BatchNorm2d(1)
         self.relu5 = nn.ReLU()
         self.upsampling3 = nn.UpsamplingBilinear2d(scale_factor=2)

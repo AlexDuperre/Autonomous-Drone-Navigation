@@ -16,7 +16,7 @@ class DND(Dataset):
         data_segmenter = DNDSegmenter(data_dir)
         self.Table = data_segmenter.segment((frames_nb,), overlap,subsegment_nb)
         random.shuffle(self.Table)
-        self.Table = self.Table[0:int(len(self.Table)*0.2)]
+        self.Table = self.Table[0:int(len(self.Table)*1)]
 
         self.transform = transform
 
