@@ -24,14 +24,14 @@ from GPUtil import showUtilization as gpu_usage
 hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
-    "batch_size" : 100,
+    "batch_size" : 15,
     "learning_rate" : 0.001,
     "specific_lr" : 0.001,
     "lr_scheduler_step" : 10,
     "num_epochs" : 25,
     "input_dim" : 150,
     "hidden_dim" : 500,
-    "layer_dim" : 2,
+    "layer_dim" : 1,
     "output_dim" : 5,
     "frame_nb" : 100,
     "sub_segment_nb": 1,
@@ -94,7 +94,7 @@ model = LSTMModel(input_dim=hyper_params["input_dim"],
                   hidden_dim=hyper_params["hidden_dim"],
                   layer_dim=hyper_params["layer_dim"],
                   output_dim=hyper_params["output_dim"],
-                  Pretrained=False)
+                  Pretrained=True)
 
 if hyper_params["pretrained"]:
     state_dict = torch.load("./Best models/checkpoint.pt")
