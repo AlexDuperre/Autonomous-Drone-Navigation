@@ -192,6 +192,7 @@ def predict(model_data_path):
 
                     command = keys_dict[predicted]
 
+                    # makes sure we are in the drone commande window
                     subprocess.call(['./activate_window.sh'])
 
 
@@ -234,6 +235,15 @@ def predict(model_data_path):
                         #     pyautogui.keyUp("w")
                         #
                         # dt = time.time() - t0
+
+                    # Refresh the hidden state (to be deactivated for long sequences)
+                    if calls % 30 == 0:
+                        # Initialize hidden state with zeros
+                        hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
+                        # Initialize cell state
+                        cn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
+
+                        print("Reresh hidden state")
 
                     # if dt > 5.:
                     #     pyautogui.keyUp("w")
