@@ -17,8 +17,13 @@ class LSTMModel(nn.Module):
 
         self.densenet = ResCNN()
         if Pretrained:
-            state_dict = torch.load('ResCNN_model.pt')
-            self.densenet.load_state_dict(state_dict)
+            state_dict = torch.load('./Best_models/Autoencoder/2/checkpoint.pt')
+
+            prefix = "Encoder."
+            n_clip = len(prefix)
+            adapted_dict = {k[n_clip:]: v for k, v in state_dict.items()
+                            if k.startswith(prefix)}
+            self.densenet.load_state_dict(adapted_dict)
 
 
         ############################################
