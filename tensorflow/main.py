@@ -25,10 +25,10 @@ hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
     "batch_size" : 100,
-    "learning_rate" : 0.01,
-    "specific_lr" : 0.001,
-    "lr_scheduler_step" : 12,
-    "num_epochs" : 45,
+    "learning_rate" : 0.001,
+    "specific_lr" : 0.0001,
+    "lr_scheduler_step" : 20,
+    "num_epochs" : 65,
     "input_dim" : 450,
     "hidden_dim" : 1000,
     "layer_dim" : 1,
@@ -51,7 +51,7 @@ early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
 
-dataset = DND("C:/aldupd/DND/Smaller depth None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("C:/aldupd/DND/light dataset None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
 print("Dataset length: ", dataset.__len__())
 
@@ -157,7 +157,7 @@ for epoch in range(hyper_params["num_epochs"]):
         for j in range(actual_subsegment_nb):
             inputA = depth[:,j,:,:,:].cuda()
             inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps)], -1).cuda()
-            input = [inputA, inputB]
+            input = [inputA, inputB.float()]
             label = labels[:,j,:].cuda()
 
             # Forward pass
@@ -222,7 +222,7 @@ for epoch in range(hyper_params["num_epochs"]):
                                    rel_goaly[:, j, :, :] / (
                                                rel_goaly[:, 0, 0, :].unsqueeze(1).repeat(1, depth.shape[2], 1) + eps)],
                                   -1).cuda()
-                input = [inputA, inputB]
+                input = [inputA, inputB.float()]
                 label = labels[:, j, :].cuda()
 
                 # Forward pass
@@ -248,8 +248,8 @@ for epoch in range(hyper_params["num_epochs"]):
         experiment.log_metric("valid_epoch_accuracy", acc, step=epoch)
 
     # Adjust learning rate
-    if epoch < 20:
-        exp_lr_scheduler.step()
+    # if epoch < 20:
+    exp_lr_scheduler.step()
 
     # Check if we should stop early
     early_stopping(meanLoss / sub_segment_nb, model)
@@ -289,7 +289,7 @@ with torch.no_grad():
         for j in range(actual_subsegment_nb):
             inputA = depth[:,j,:,:,:].cuda()
             inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps)], -1).cuda()
-            input = [inputA, inputB]
+            input = [inputA, inputB.float()]
 
             label = labels[:,j,:].cuda()
 
@@ -316,7 +316,7 @@ with torch.no_grad():
 
 # Logging reults
 experiment.log_metric("test_loss", meanLoss / sub_segment_nb, step=epoch)
-experiment.log_metric("test_accuracy", acc, step=epoch)
+experiment.log_metric("test_accuracy", test_acc, step=epoch)
 
 # # plotting graphs (not needed if using comet ml)
 # plt.figure()

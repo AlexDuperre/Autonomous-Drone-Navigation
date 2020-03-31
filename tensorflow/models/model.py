@@ -21,6 +21,16 @@ class LSTMModel(nn.Module):
             self.densenet.load_state_dict((state_dict))
 
 
+        self.dense1 = nn.Linear(1,200)
+        self.relu = nn.ReLU()
+        self.dense2 = nn.Linear(200,400)
+
+        self.orientation_rep = nn.Sequential(
+            self.dense1,
+            self.relu,
+            self.dense2
+        )
+
         ############################################
         #LSTM
 
@@ -62,8 +72,9 @@ class LSTMModel(nn.Module):
         featuresA = featuresA.reshape(batch_size, seq_length,-1)
 
         # Concatenate features together
-        featuresB = x[1]
-        Features = featuresA #torch.cat([featuresA, featuresB.type(torch.float)], dim=2)
+        featuresB = self.orientation_rep(x[1][:,:,0].reshape(batch_size*seq_length,-1))
+        featuresB = featuresB.reshape(batch_size,seq_length,-1)
+        Features = torch.cat([featuresA, featuresB.type(torch.float)], dim=2) #redondant float
 
         # Representation of the input
         # out = self.fc1(Features)

@@ -4,7 +4,7 @@ import torch.nn as nn
 class weightedLoss(nn.Module):
     def __init__(self):
         super(weightedLoss, self).__init__()
-        self.crossentropy = nn.CrossEntropyLoss(weight=torch.Tensor([0.8213502735, 1.1260713329, 1.116669019, 4.3366425512, 4.3308459881]).cuda(),reduction="none") #[0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]
+        self.crossentropy = nn.CrossEntropyLoss(weight=torch.Tensor([0.8213502735, 2.6, 2.116669019, 4.3366425512, 4.3308459881]).cuda(),reduction="none") #[0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]
 
     def sample_weighter(self, depth):
         batch, frame_nb, _, _ = depth.shape
