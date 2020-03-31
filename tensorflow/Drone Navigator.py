@@ -16,6 +16,7 @@ import util.keyloggerFct as keyloggerFct
 from util.tools import post_treatment
 from util.tools import telemetry_transform
 from util.tools import get_goals
+from util.tools import fix_angle
 
 import h5py
 from util.tools import extract_data
@@ -24,10 +25,11 @@ from util.tools import indexer
 from util.tools import VideoCapture
 
 import torch
-from Best_models.new_best.models.model import LSTMModel
+from Best_models.BEST.models.model import LSTMModel
 
 import pyautogui
 import subprocess
+from threading import Thread
 
 """
 Select the number associated to the world
@@ -43,7 +45,7 @@ Select the number associated to the world
 9 - Scanned home 2nd floor
 """
 
-world_no = 9
+world_no = 3
 world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home", "scanned_home_2e_floor"]
 
 # Initialize and start keylogger
@@ -60,7 +62,7 @@ hyper_params = {
     "specific_lr" : 0.001,
     "lr_scheduler_step" : 12,
     "num_epochs" : 45,
-    "input_dim" : 450,
+    "input_dim" : 650,
     "hidden_dim" : 1000,
     "layer_dim" : 1,
     "output_dim" : 5,
@@ -119,11 +121,20 @@ def predict(model_data_path):
                   output_dim=hyper_params["output_dim"],
                   Pretrained=False)
 
-    state_dict = torch.load("./Best_models/new_best/checkpoint.pt")
+    state_dict = torch.load("./Best_models/BEST/checkpoint.pt")
     model.load_state_dict(state_dict)
+
+    # Initialize hidden state with zeros
+    hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
+    # Initialize cell state
+    cn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
 
     model = model
     model.eval()
+
+    config = tf.ConfigProto(
+        device_count =  {"GPU":0}
+    )
 
     with tf.Session() as sess:
 
@@ -136,11 +147,6 @@ def predict(model_data_path):
 
         # Use to load from npy file
         # net.load(model_data_path, sess)
-
-        # Initialize hidden state with zeros
-        hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
-        # Initialize cell state
-        cn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
 
         running = True
         auto_navigating = False
@@ -183,17 +189,19 @@ def predict(model_data_path):
 
                 calls += 1
 
-                if calls % 1 == 0:
+                if calls == 10:
+                    print(fix_angle(rel_orientation))
                     depth = cv2.resize(pred[0,:,:,0], dsize=(160, 92), interpolation=cv2.INTER_CUBIC)
-                    lstm_input = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
-                    out, (hn, cn) = model([lstm_input, 0], hn, cn)
+                    lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
+                    lstm_inputB = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
+                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], hn, cn)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
 
                     command = keys_dict[predicted]
 
                     # makes sure we are in the drone commande window
-                    subprocess.call(['./activate_window.sh'])
+                    # subprocess.call(['./activate_window.sh'])
 
 
                     if predicted == 0:
@@ -207,7 +215,7 @@ def predict(model_data_path):
                     elif any(predicted == [1, 2]):
                         print(command)
                         pyautogui.keyUp("w")
-                        pyautogui.keyDown(command, pause=2)
+                        pyautogui.keyDown(command, pause=1.5)
                         pyautogui.keyUp(command)
 
                         # dt = time.time() - t0
@@ -215,7 +223,7 @@ def predict(model_data_path):
                     elif predicted == 3:
                         print("w+q")
                         # if not start:
-                        #     pyautogui.keyDown("w")
+                        pyautogui.keyDown("w")
                         pyautogui.keyDown("q", pause=0.5)
                         pyautogui.keyUp("q")
 
@@ -227,7 +235,7 @@ def predict(model_data_path):
                     elif predicted == 4:
                         print("w+e")
                         # if not start:
-                        #     pyautogui.keyDown("w")
+                        pyautogui.keyDown("w")
                         pyautogui.keyDown("e", pause=0.5)
                         pyautogui.keyUp("e")
 
@@ -245,6 +253,8 @@ def predict(model_data_path):
 
                         print("Reresh hidden state")
 
+                    calls = 0
+
                     # if dt > 5.:
                     #     pyautogui.keyUp("w")
                     #     start = True
@@ -254,10 +264,10 @@ def predict(model_data_path):
                     # print(dt)
 
 
-            cv2.imshow("Depth", image)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-
-                break
+            # cv2.imshow("Depth", image)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #
+            #     break
 
             # print(keyloggerFct.key)
 

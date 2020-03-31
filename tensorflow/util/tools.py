@@ -110,6 +110,14 @@ def indexer(file_path):
 
     return file_path
 
+def fix_angle(rel_orientation):
+    # makes sure the angle is between pi and - pi
+    if rel_orientation > np.pi:
+        rel_orientation = -1.0*(2*np.pi - rel_orientation)
+    elif rel_orientation < -np.pi:
+        rel_orientation = 2*np.pi - (-1.0*rel_orientation)
+    # normalises the angle between -1 an 1
+    return np.around(np.float32(rel_orientation/ np.pi), 3)
 
 def main():
     # goals = get_goals("../destinations.ods",1)
