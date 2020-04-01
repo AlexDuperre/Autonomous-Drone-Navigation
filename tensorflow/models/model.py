@@ -100,23 +100,23 @@ class ResCNN(nn.Module):
 
         self.conv1 = nn.Conv2d(1,16, 5)
         self.batchNorm1 = nn.BatchNorm2d(16)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.Tanh()#nn.ReLU()
         self.avgpool1 = nn.AvgPool2d(2)
 
 
         self.conv2 = nn.Conv2d(16, 32,5)
         self.batchNorm2 = nn.BatchNorm2d(32)
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.Tanh()#nn.ReLU()
 
 
         self.conv3 = nn.Conv2d(32, 32, 3)
         self.batchNorm3 = nn.BatchNorm2d(32)
-        self.relu3 = nn.ReLU()
+        self.relu3 = nn.Tanh()#nn.ReLU()
         self.avgpool2 = nn.AvgPool2d(2)
 
 
         self.fc1 = nn.Linear(23040, 5000)
-        self.relu4 = nn.ReLU()
+        self.relu4 = nn.Tanh()#nn.ReLU()
         self.fc2 =  nn.Linear(5000, 450)
         # self.fc3 = nn.Linear(150, 6)
 
@@ -181,23 +181,23 @@ class ResCNNDecoder(nn.Module):
 
 
         self.fc1 = nn.Linear(450, 5000)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.Tanh()#nn.ReLU()
         self.fc2 =  nn.Linear(5000, 23040)
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.Tanh()#nn.ReLU()
 
 
         self.conv1 = nn.Conv2d(32, 32, 3, 1, 3)
         self.batchNorm1 = nn.BatchNorm2d(32)
-        self.relu3 = nn.ReLU()
+        self.relu3 = nn.Tanh()#nn.ReLU()
         self.upsampling1 = nn.UpsamplingBilinear2d(scale_factor=2)
 
         self.conv2 = nn.Conv2d(32, 16, 5, 1, 1)
         self.batchNorm2 = nn.BatchNorm2d(16)
-        self.relu4 = nn.ReLU()
+        self.relu4 = nn.Tanh()#nn.ReLU()
 
         self.conv3 = nn.Conv2d(16, 1, 5, 1, 3)
         self.batchNorm3 = nn.BatchNorm2d(1)
-        self.relu5 = nn.ReLU()
+        self.relu5 = nn.Tanh()#nn.ReLU()
         self.upsampling3 = nn.UpsamplingBilinear2d(scale_factor=2)
 
 

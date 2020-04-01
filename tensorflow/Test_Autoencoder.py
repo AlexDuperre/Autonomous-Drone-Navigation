@@ -32,7 +32,8 @@ hyper_params = {
 
 
 # Initialize the dataset
-dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+# dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("C:/aldupd/dataset/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"])
 print("Dataset length: ", dataset.__len__())
 
 
@@ -73,7 +74,7 @@ print(len(test_loader))
 # MODEL
 model = AutoEncoder()
 
-model_state_dict = torch.load("./Best models/Autoencoder/checkpoint.pt")
+model_state_dict = torch.load("./Best_models/Autoencoder/5/checkpoint.pt")
 
 model.load_state_dict((model_state_dict))
 model = model.cuda()
