@@ -26,6 +26,7 @@ from util.tools import VideoCapture
 
 import torch
 from Best_models.BEST.models.model import LSTMModel
+from Navigator import Navigate
 
 import pyautogui
 import subprocess
@@ -53,33 +54,6 @@ keyloggerFct.init()
 keywatch = keyloggerFct.Keystroke_Watcher()
 keywatch.hm.start()
 
-# LSTM Hyperparameters
-hyper_params = {
-    "validationRatio" : 0.3,
-    "validationTestRatio" : 0.5,
-    "batch_size" : 100,
-    "learning_rate" : 0.01,
-    "specific_lr" : 0.001,
-    "lr_scheduler_step" : 12,
-    "num_epochs" : 45,
-    "input_dim" : 650,
-    "hidden_dim" : 1000,
-    "layer_dim" : 1,
-    "output_dim" : 5,
-    "frame_nb" : 100,
-    "sub_segment_nb": 1,
-    "segment_overlap": 0,
-    "patience" : 10,
-    "skip_frames" : 3
-}
-
-keys_dict = {
-    0 : "w",
-    1 : "q",
-    2 : "e",
-    3 : ["w", "q"],
-    4 : ["w", "e"]
-}
 
 def predict(model_data_path):
     TCP_IP = '127.0.0.1'
@@ -115,22 +89,7 @@ def predict(model_data_path):
 
     # Add Pytorch Navigator network
 
-    model = LSTMModel(input_dim=hyper_params["input_dim"],
-                  hidden_dim=hyper_params["hidden_dim"],
-                  layer_dim=hyper_params["layer_dim"],
-                  output_dim=hyper_params["output_dim"],
-                  Pretrained=False)
-
-    state_dict = torch.load("./Best_models/BEST/checkpoint.pt")
-    model.load_state_dict(state_dict)
-
-    # Initialize hidden state with zeros
-    hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
-    # Initialize cell state
-    cn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
-
-    model = model
-    model.eval()
+    Drone_nav = Navigate()
 
     config = tf.ConfigProto(
         device_count =  {"GPU":0}
@@ -150,10 +109,6 @@ def predict(model_data_path):
 
         running = True
         auto_navigating = False
-        calls = 0
-        start = True
-        dt = 0
-        t0 = 1e-18
         while running:
             # Measuring time t1
             # t1 = time.time()
@@ -187,81 +142,8 @@ def predict(model_data_path):
                 image = cv2.putText(image, 'Auto Navigating', (0, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255))
                 # batch.append([pred[0,:,:,0], img, float("%.3f"%(rel_destination[0])), float("%.3f"%(rel_destination[1])), float("%.3f"%(destination_orientation)), float("%.3f"%(rel_orientation)), np.string_(keyloggerFct.key)])
 
-                calls += 1
+                Thread(target=Drone_nav.forward, args=(pred, rel_orientation,)).start()
 
-                if calls == 10:
-                    print(fix_angle(rel_orientation))
-                    depth = cv2.resize(pred[0,:,:,0], dsize=(160, 92), interpolation=cv2.INTER_CUBIC)
-                    lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
-                    lstm_inputB = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
-                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], hn, cn)
-                    _, predicted = torch.max(out.data, 2)
-                    predicted = predicted.numpy()[0][0]
-
-                    command = keys_dict[predicted]
-
-                    # makes sure we are in the drone commande window
-                    # subprocess.call(['./activate_window.sh'])
-
-
-                    if predicted == 0:
-                        print("w")
-                        pyautogui.keyDown(command)
-
-                        # if start:
-                        #     t0 = time.time()
-                        #     start = False
-
-                    elif any(predicted == [1, 2]):
-                        print(command)
-                        pyautogui.keyUp("w")
-                        pyautogui.keyDown(command, pause=1.5)
-                        pyautogui.keyUp(command)
-
-                        # dt = time.time() - t0
-
-                    elif predicted == 3:
-                        print("w+q")
-                        # if not start:
-                        pyautogui.keyDown("w")
-                        pyautogui.keyDown("q", pause=0.5)
-                        pyautogui.keyUp("q")
-
-                        # if not start:
-                        #     pyautogui.keyUp("w")
-
-                        # dt = time.time() - t0
-
-                    elif predicted == 4:
-                        print("w+e")
-                        # if not start:
-                        pyautogui.keyDown("w")
-                        pyautogui.keyDown("e", pause=0.5)
-                        pyautogui.keyUp("e")
-
-                        # if not start:
-                        #     pyautogui.keyUp("w")
-                        #
-                        # dt = time.time() - t0
-
-                    # Refresh the hidden state (to be deactivated for long sequences)
-                    if calls % 30 == 0:
-                        # Initialize hidden state with zeros
-                        hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
-                        # Initialize cell state
-                        cn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
-
-                        print("Reresh hidden state")
-
-                    calls = 0
-
-                    # if dt > 5.:
-                    #     pyautogui.keyUp("w")
-                    #     start = True
-                    #     print("Reached forward time limit")
-                    #     t0 = 1e-18
-
-                    # print(dt)
 
 
             # cv2.imshow("Depth", image)
