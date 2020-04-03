@@ -3,7 +3,7 @@ import numpy as np
 import pyautogui
 from util.tools import fix_angle
 import cv2
-from models.model import LSTMModel
+from Best_models.BEST.models.model import LSTMModel
 
 class Navigate(object):
 
@@ -17,7 +17,7 @@ class Navigate(object):
             "specific_lr": 0.001,
             "lr_scheduler_step": 12,
             "num_epochs": 45,
-            "input_dim": 650,
+            "input_dim": 850,
             "hidden_dim": 1000,
             "layer_dim": 1,
             "output_dim": 5,
@@ -55,9 +55,11 @@ class Navigate(object):
         # model = model
         self.model.eval()
 
+        print("...model loaded")
+
         self.calls = 0
     def forward(self, pred, rel_orientation):
-        self.calss += 1
+        self.calls += 1
         depth = cv2.resize(pred[0,:,:,0], dsize=(160, 92), interpolation=cv2.INTER_CUBIC)
         lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
         lstm_inputB = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)

@@ -28,9 +28,11 @@ import torch
 from Best_models.BEST.models.model import LSTMModel
 from Navigator import Navigate
 
+import Xlib.threaded
+from threading import Thread
 import pyautogui
 import subprocess
-from threading import Thread
+
 
 """
 Select the number associated to the world
@@ -109,6 +111,7 @@ def predict(model_data_path):
 
         running = True
         auto_navigating = False
+        call = 0
         while running:
             # Measuring time t1
             # t1 = time.time()
@@ -142,14 +145,17 @@ def predict(model_data_path):
                 image = cv2.putText(image, 'Auto Navigating', (0, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255))
                 # batch.append([pred[0,:,:,0], img, float("%.3f"%(rel_destination[0])), float("%.3f"%(rel_destination[1])), float("%.3f"%(destination_orientation)), float("%.3f"%(rel_orientation)), np.string_(keyloggerFct.key)])
 
-                Thread(target=Drone_nav.forward, args=(pred, rel_orientation,)).start()
+                call += 1
+                if call == 5:
+
+                    Thread(target=Drone_nav.forward, args=(pred, rel_orientation,)).start()
+                    call = 0
 
 
+            cv2.imshow("Depth", image)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
 
-            # cv2.imshow("Depth", image)
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #
-            #     break
+                break
 
             # print(keyloggerFct.key)
 
@@ -157,7 +163,6 @@ def predict(model_data_path):
             if (keyloggerFct.key == 'space') & (auto_navigating == True):
 
 
-                batch = []
                 auto_navigating = False
                 # save last destination and get new destination
                 last_destination_id = destination_id
@@ -165,10 +170,6 @@ def predict(model_data_path):
                 # destination_id += 1
                 destination = eval(destination_list[destination_id])
 
-                # Initialize hidden state with zeros
-                hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
-                # Initialize cell state
-                cn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
 
                 print("RECORDING STOPPED")
 
@@ -177,7 +178,7 @@ def predict(model_data_path):
                 pyautogui.keyUp("q")
                 pyautogui.keyUp("e")
                 auto_navigating = True
-                print("RECORDING")
+                print("AUTO NAVIGATING")
 
             if keyloggerFct.key == 'BackSpace':
                 pyautogui.keyUp("w")
