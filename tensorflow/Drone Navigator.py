@@ -45,7 +45,7 @@ Select the number associated to the world
 9 - Scanned home 2nd floor
 """
 
-world_no = 3
+world_no = 1
 world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home", "scanned_home_2e_floor"]
 
 # Initialize and start keylogger
@@ -62,7 +62,7 @@ hyper_params = {
     "specific_lr" : 0.001,
     "lr_scheduler_step" : 12,
     "num_epochs" : 45,
-    "input_dim" : 650,
+    "input_dim" : 850,
     "hidden_dim" : 1000,
     "layer_dim" : 1,
     "output_dim" : 5,
@@ -160,7 +160,8 @@ def predict(model_data_path):
 
             # get current frame telemetry
             data = s2.recv(BUFFER_SIZE)
-            split_data = data.decode().split(',')
+            data = data.decode().split("#")[1]
+            split_data = data.split(',')
             if len(split_data[3].split('.')) > 2:
                 var = split_data[3].split('.')
                 split_data[3] = var[0] + '.' + var[1][0:3]
@@ -215,7 +216,7 @@ def predict(model_data_path):
                     elif any(predicted == [1, 2]):
                         print(command)
                         pyautogui.keyUp("w")
-                        pyautogui.keyDown(command, pause=1.5)
+                        pyautogui.keyDown(command, pause=1.)
                         pyautogui.keyUp(command)
 
                         # dt = time.time() - t0
@@ -245,7 +246,7 @@ def predict(model_data_path):
                         # dt = time.time() - t0
 
                     # Refresh the hidden state (to be deactivated for long sequences)
-                    if calls % 30 == 0:
+                    if calls % 30*10 == 0:
                         # Initialize hidden state with zeros
                         hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
                         # Initialize cell state
@@ -264,10 +265,10 @@ def predict(model_data_path):
                     # print(dt)
 
 
-            # cv2.imshow("Depth", image)
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #
-            #     break
+            cv2.imshow("Depth", image)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+
+                break
 
             # print(keyloggerFct.key)
 
