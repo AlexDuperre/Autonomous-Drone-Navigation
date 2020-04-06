@@ -29,7 +29,7 @@ hyper_params = {
     "specific_lr" : 0.0001,
     "lr_scheduler_step" : 20,
     "num_epochs" : 65,
-    "input_dim" : 450,
+    "input_dim" : 850,
     "hidden_dim" : 1000,
     "layer_dim" : 1,
     "output_dim" : 5,
@@ -51,7 +51,7 @@ early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
 
-dataset = DND("C:/aldupd/DND/light dataset None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("/windows/aldupd/light dataset V2", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
 print("Dataset length: ", dataset.__len__())
 
@@ -106,11 +106,6 @@ model = model.cuda()
 criterion = weightedLoss()
 
 # Optimzer
-# optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
-#                               {"params": model.densenet.classifier.parameters()},
-#                               {"params": model.lstm.parameters()},
-#                               {"params": model.fc.parameters()}],
-#                              lr=hyper_params["learning_rate"])
 optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hyper_params["specific_lr"]},
                               {"params": model.lstm.parameters()},
                               {"params": model.fc.parameters()}],

@@ -22,12 +22,12 @@ class LSTMModel(nn.Module):
 
 
         self.dense1 = nn.Linear(1,200)
-        self.relu = nn.ReLU()
+        self.tanact = nn.Tanh()
         self.dense2 = nn.Linear(200,400)
 
         self.orientation_rep = nn.Sequential(
             self.dense1,
-            self.relu,
+            self.tanact,
             self.dense2
         )
 
