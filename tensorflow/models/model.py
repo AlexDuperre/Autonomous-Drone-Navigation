@@ -17,7 +17,7 @@ class LSTMModel(nn.Module):
 
         self.densenet = ResCNN()
         if Pretrained:
-            state_dict = torch.load('./Best_models/Autoencoder/2/checkpoint.pt')
+            state_dict = torch.load('./Best_models/Autoencoder/5/checkpoint.pt')
 
             prefix = "Encoder."
             n_clip = len(prefix)

@@ -24,13 +24,13 @@ from GPUtil import showUtilization as gpu_usage
 hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
-    "batch_size" : 15,
-    "learning_rate" : 0.001,
-    "specific_lr" : 0.001,
-    "lr_scheduler_step" : 10,
-    "num_epochs" : 25,
-    "input_dim" : 150,
-    "hidden_dim" : 500,
+    "batch_size" : 40,
+    "learning_rate" : 0.0001,
+    "specific_lr" : 0.000001,
+    "lr_scheduler_step" : 35,
+    "num_epochs" : 100,
+    "input_dim" : 450,
+    "hidden_dim" : 1000,
     "layer_dim" : 1,
     "output_dim" : 5,
     "frame_nb" : 100,
@@ -111,11 +111,6 @@ model = model.cuda()
 criterion = weightedLoss()
 
 # Optimzer
-# optimizer = torch.optim.Adam([{"params": model.densenet.features.parameters(), "lr": hyper_params["specific_lr"]},
-#                               {"params": model.densenet.classifier.parameters()},
-#                               {"params": model.lstm.parameters()},
-#                               {"params": model.fc.parameters()}],
-#                              lr=hyper_params["learning_rate"])
 optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hyper_params["specific_lr"]},
                               {"params": model.lstm.parameters()},
                               {"params": model.fc.parameters()}],
@@ -152,7 +147,7 @@ for epoch in range(hyper_params["num_epochs"]):
         rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
         rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :].requires_grad_()
-        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
+        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]].long()
 
         # Initialize hidden state with zeros
         hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).requires_grad_().cuda()
@@ -213,7 +208,7 @@ for epoch in range(hyper_params["num_epochs"]):
             rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
             rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :]
             rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :]
-            labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
+            labels = labels[:, :, 0:-1:hyper_params["skip_frames"]].long()
 
             # Initialize hidden state with zeros
             hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0],hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
@@ -283,7 +278,7 @@ with torch.no_grad():
         rel_orientation = rel_orientation[:, :, 0:-1:hyper_params["skip_frames"], :]
         rel_goalx = rel_goalx[:, :, 0:-1:hyper_params["skip_frames"], :]
         rel_goaly = rel_goaly[:, :, 0:-1:hyper_params["skip_frames"], :]
-        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]]
+        labels = labels[:, :, 0:-1:hyper_params["skip_frames"]].long()
 
         # Initialize hidden state with zeros
         hn = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).detach().requires_grad_().cuda()
