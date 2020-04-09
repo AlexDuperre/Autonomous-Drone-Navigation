@@ -154,6 +154,7 @@ def predict(model_data_path):
         start = True
         dt = 0
         t0 = 1e-18
+        prev_command = 0
         while running:
             # Measuring time t1
             # t1 = time.time()
@@ -194,10 +195,13 @@ def predict(model_data_path):
                     print(fix_angle(rel_orientation))
                     depth = cv2.resize(pred[0,:,:,0], dsize=(160, 92), interpolation=cv2.INTER_CUBIC)
                     lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
-                    lstm_inputB = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
+                    orientation = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
+                    prev_command = torch.from_numpy((prev_command == np.arange(5))).unsqueeze(0).unsqueeze(0).float()
+                    lstm_inputB = torch.cat([orientation, prev_command],-1)
                     out, (hn, cn) = model([lstm_inputA, lstm_inputB], hn, cn)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
+                    prev_command = predicted
 
                     command = keys_dict[predicted]
 
