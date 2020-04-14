@@ -16,7 +16,7 @@ class DND(Dataset):
         data_segmenter = DNDSegmenter(data_dir)
         self.Table = data_segmenter.segment((frames_nb,), overlap,subsegment_nb)
         random.shuffle(self.Table)
-        self.Table = self.Table[0:int(len(self.Table)*0.02)]
+        self.Table = self.Table[0:int(len(self.Table)*1)]
 
         self.transform = transform
 
@@ -33,8 +33,7 @@ class DND(Dataset):
 
         # test frames
         Testframes = False
-        if Testframes:
-            for i in range(len(GT)):
+             for i in range(len(GT)):
                 image = depth[i]
                 rel_goal = rel_goalx[i], rel_goaly[i]
                 image = display_trajectory(image, rel_goal, fix_angle(rel_orientation[i]))
