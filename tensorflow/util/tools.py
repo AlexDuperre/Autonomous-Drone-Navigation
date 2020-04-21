@@ -6,7 +6,8 @@ import cv2, queue, threading
 from matplotlib.pylab import cm
 import numpy as np
 import pyexcel_ods
-
+import matplotlib.pyplot as plt
+import torch
 
 """
 bufferless VideoCapture functions
@@ -109,6 +110,55 @@ def indexer(file_path):
 
 
     return file_path
+
+"""
+Compute path data for the Display_path function 
+"""
+def compute_paths(rel_orientation, relx, rely, predictions, path, dtheta=0.15):
+    destination = get_goals("./destinations.ods", 3)
+    start = eval(destination[eval(path.split("_")[-3])])
+    theta = np.tan(rely[0]/relx[0]) + rel_orientation[0] * np.pi
+    pred_points_x = [start[0]]
+    pred_points_y = [start[1]]
+    dx = 0
+    dy = 0
+    for i, pred in enumerate(predictions):
+        if pred == 0:
+            dx = np.cos(theta)
+            dy = np.sin(theta)
+        if pred == 1:
+            theta = theta + dtheta
+        if pred == 2:
+            theta = theta - dtheta
+        if pred == 3:
+            theta = theta + dtheta
+            dx = np.cos(theta)
+            dy = np.sin(theta)
+        if pred == 4:
+            theta = theta - dtheta
+            dx = np.cos(theta)
+            dy = np.sin(theta)
+
+        pred_points_x.append(pred_points_x[i] + dx)
+        pred_points_y.append(pred_points_y[i] + dy)
+        dx = 0
+        dy = 0
+    return [pred_points_x,pred_points_y]
+
+
+"""
+Display predicted path for the validation run compared for the ground truth 
+"""
+def display_paths(sets, epoch, nb):
+    plt.plot(sets[0][0],sets[0][1])
+    plt.plot(sets[1][0], sets[1][1])
+    plt.legend(["pred","true"])
+    root = "./val paths/" + "epoch " + str(epoch) + "/"
+    if not os.path.exists(root):
+        os.makedirs(root)
+    plt.savefig(root + str(nb) + ".jpg")
+    plt.show(block=False)
+    plt.close()
 
 
 def main():

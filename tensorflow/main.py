@@ -8,13 +8,15 @@ from models.dataset import DND
 from models.model import LSTMModel
 from util.focalloss import FocalLoss
 from util.custom_loss import weightedLoss
+from util.custom_loss import pathLoss
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from util.pytorchtools import EarlyStopping
 
-
+from util.tools import compute_paths
+from util.tools import display_paths
 
 from sklearn.metrics import confusion_matrix
 from util.confusion_matrix import plot_confusion_matrix
@@ -28,7 +30,7 @@ hyper_params = {
     "learning_rate" : 0.001,
     "specific_lr" : 0.0001,
     "lr_scheduler_step" : 20,
-    "num_epochs" : 65,
+    "num_epochs" : 50,
     "input_dim" : 850,
     "hidden_dim" : 1000,
     "layer_dim" : 1,
@@ -36,7 +38,7 @@ hyper_params = {
     "frame_nb" : 100,
     "sub_segment_nb": 1,
     "segment_overlap": 0,
-    "patience" : 10,
+    "patience" : 50,
     "skip_frames" : 3
 }
 
@@ -51,7 +53,7 @@ early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
 
-dataset = DND("C:/aldupd/DND/Smaller depth None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("C:/aldupd/DND/light dataset V2/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
 val_test_set = DND("C:/aldupd/DND/val-test set/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
@@ -106,6 +108,7 @@ model = model.cuda()
 # criterion = FocalLoss(gamma=5)
 # criterion = nn.CrossEntropyLoss()
 criterion = weightedLoss()
+val_loss = pathLoss(frequency=10)
 
 # Optimzer
 optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hyper_params["specific_lr"]},
@@ -132,7 +135,7 @@ for epoch in range(hyper_params["num_epochs"]):
     batch_step = 0
     model.train()
     outputs = []
-    for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(train_loader):
+    for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, path) in enumerate(train_loader):
         actual_subsegment_nb = int(depth.shape[1]/hyper_params["frame_nb"])
         depth = depth.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2], depth.shape[3])
         rel_orientation = rel_orientation.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], -1)
@@ -160,9 +163,9 @@ for epoch in range(hyper_params["num_epochs"]):
             # Forward pass
             outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
-
             # loss = criterion(outputs.view(-1,6), label.view(-1))
-            loss = criterion(outputs, label, inputA)
+            loss = criterion(outputs, label, input)
+            # loss = criterion(outputs, label)
             meanLoss += loss.cpu().detach().numpy()
 
             # Backward and optimize
@@ -192,7 +195,7 @@ for epoch in range(hyper_params["num_epochs"]):
         total = 0
         sub_segment_nb = 0
         meanLoss = 0
-        for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(valid_loader):
+        for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, path) in enumerate(valid_loader):
             actual_subsegment_nb = int(depth.shape[1] / hyper_params["frame_nb"])
             depth = depth.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2],
                                depth.shape[3])
@@ -226,12 +229,23 @@ for epoch in range(hyper_params["num_epochs"]):
                 outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
                 # loss = criterion(outputs.view(-1, 6), label.view(-1))
-                loss = criterion(outputs, label, inputA)
+                # loss = criterion(outputs, label, input)
+                loss = val_loss(outputs, label, epoch)
+
                 meanLoss += loss.cpu().detach().numpy()
                 _, predicted = torch.max(outputs.data, 2)
                 total += len(label.view(-1))
                 correct += (predicted.view(-1) == label.view(-1)).sum().item()
                 sub_segment_nb += 1
+
+                # predpts = compute_paths(rel_orientation[0, j, :, :].detach().numpy(),
+                #                         rel_goalx[0, j, :, :].detach().numpy(), rel_goaly[0, j, :, :].detach().numpy(),
+                #                         predicted[0].cpu().detach().numpy(), path[0])
+                # truepts = compute_paths(rel_orientation[0, j, :, :].detach().numpy(),
+                #                         rel_goalx[0, j, :, :].detach().numpy(), rel_goaly[0, j, :, :].detach().numpy(),
+                #                         label[0].cpu().detach().numpy(), path[0])
+                #
+                # display_paths([predpts, truepts], i)
 
 
         acc = 100 * correct / total
@@ -263,7 +277,7 @@ with torch.no_grad():
     meanLoss = 0
     predictions = np.empty((0,1))
     ground_truth = np.empty((0,1))
-    for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels) in enumerate(test_loader):
+    for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, path) in enumerate(test_loader):
         actual_subsegment_nb = int(depth.shape[1] / hyper_params["frame_nb"])
         depth = depth.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2],
                            depth.shape[3])
@@ -295,7 +309,7 @@ with torch.no_grad():
 
 
             # loss = criterion(outputs.view(-1,6), label.view(-1))
-            loss = criterion(outputs, label, inputA)
+            loss = criterion(outputs, label, input)
             meanLoss += loss.cpu().detach().numpy()
 
             _, predicted = torch.max(outputs.data, 2)

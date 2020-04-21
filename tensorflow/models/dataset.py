@@ -61,7 +61,7 @@ class DND(Dataset):
         # if self.transform:
         #     image = self.transform(image)
 
-        return (depth, rel_orientation, rel_goalx, rel_goaly, GT.astype(int)-1)
+        return (depth, rel_orientation, rel_goalx, rel_goaly, GT.astype(int)-1, path)
 
     def __len__(self):
         return len(self.Table)
