@@ -45,7 +45,7 @@ Select the number associated to the world
 9 - Scanned home 2nd floor
 """
 
-world_no = 1
+world_no = 3
 world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home", "scanned_home_2e_floor"]
 
 # Initialize and start keylogger
@@ -191,13 +191,19 @@ def predict(model_data_path):
 
                 calls += 1
 
-                if calls == 10:
+                if calls % 10 == 0:
+                    if calls == 10:
+                        xini = rel_destination[0]
+                        yini = rel_destination[1]
+
                     print(fix_angle(rel_orientation))
                     depth = cv2.resize(pred[0,:,:,0], dsize=(160, 92), interpolation=cv2.INTER_CUBIC)
                     lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
                     orientation = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
                     prev_command = torch.from_numpy((prev_command == np.arange(5))).unsqueeze(0).unsqueeze(0).float()
-                    lstm_inputB = torch.cat([orientation, prev_command],-1)
+                    relx = torch.from_numpy(np.array(rel_destination[0]/xini)).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
+                    rely = torch.from_numpy(np.array(rel_destination[1]/yini)).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
+                    lstm_inputB = torch.cat([orientation, relx,rely],-1)
                     out, (hn, cn) = model([lstm_inputA, lstm_inputB], hn, cn)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
@@ -250,7 +256,7 @@ def predict(model_data_path):
                         # dt = time.time() - t0
 
                     # Refresh the hidden state (to be deactivated for long sequences)
-                    if calls % 30*10 == 0:
+                    if calls == 300:
                         # Initialize hidden state with zeros
                         hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
                         # Initialize cell state
@@ -258,7 +264,7 @@ def predict(model_data_path):
 
                         print("Reresh hidden state")
 
-                    calls = 0
+                        calls = 0
 
                     # if dt > 5.:
                     #     pyautogui.keyUp("w")

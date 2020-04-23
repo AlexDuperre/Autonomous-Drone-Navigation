@@ -51,9 +51,9 @@ class TrajectorySegmenter:
                 #     sequence_lengths.append(dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0])
                 #     dropped_frames -= dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0]
                 #
-                # if dropped_frames > 0:
-                #     print("Last {} frames not used for trajectory {}".format(dropped_frames,
-                #                                                              trajectory))
+                if dropped_frames > 0:
+                    print("Last {} frames not used for trajectory {}".format(dropped_frames,
+                                                                             trajectory))
 
 
                 sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
@@ -116,19 +116,19 @@ class DNDSegmenter(TrajectorySegmenter):
 
     def data_balancer(self, dataset, segments):
         new_segments = []
-        for segment in segments:
-
-            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==2):
-                new_segments.extend(2*[segment])
-
-            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==3):
-                new_segments.extend(2*[segment])
-
-            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==4):
-                new_segments.extend(15*[segment])
-
-            if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==5):
-                new_segments.extend(15*[segment])
-
-        segments.extend(new_segments)
+        # for segment in segments:
+        #
+        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==2):
+        #         new_segments.extend(2*[segment])
+        #
+        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==3):
+        #         new_segments.extend(2*[segment])
+        #
+        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==4):
+        #         new_segments.extend(15*[segment])
+        #
+        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==5):
+        #         new_segments.extend(15*[segment])
+        #
+        # segments.extend(new_segments)
         return segments
