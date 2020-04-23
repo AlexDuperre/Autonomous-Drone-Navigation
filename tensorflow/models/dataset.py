@@ -33,8 +33,7 @@ class DND(Dataset):
 
         # test frames
         Testframes = False
-        if Testframes:
-            for i in range(len(GT)):
+             for i in range(len(GT)):
                 image = depth[i]
                 rel_goal = rel_goalx[i], rel_goaly[i]
                 image = display_trajectory(image, rel_goal, fix_angle(rel_orientation[i]))
