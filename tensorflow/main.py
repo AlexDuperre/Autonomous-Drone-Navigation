@@ -26,7 +26,7 @@ from util.confusion_matrix import plot_confusion_matrix
 hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
-    "batch_size" : 100,
+    "batch_size" : 128,
     "learning_rate" : 0.001,
     "specific_lr" : 0.0001,
     "lr_scheduler_step" : 20,
@@ -53,7 +53,7 @@ early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
 
-dataset = DND("C:/aldupd/DND/light dataset V2/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("C:/aldupd/DND/Smaller depth None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
 val_test_set = DND("C:/aldupd/DND/val-test set/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
@@ -107,7 +107,7 @@ model = model.cuda()
 # criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]).cuda())
 # criterion = FocalLoss(gamma=5)
 # criterion = nn.CrossEntropyLoss()
-criterion = weightedLoss()
+# criterion = weightedLoss()
 val_loss = pathLoss(frequency=10)
 
 # Optimzer
@@ -164,8 +164,8 @@ for epoch in range(hyper_params["num_epochs"]):
             outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
             # loss = criterion(outputs.view(-1,6), label.view(-1))
-            loss = criterion(outputs, label, input)
-            # loss = criterion(outputs, label)
+            # loss = criterion(outputs, label, input)
+            loss = val_loss(outputs, label)
             meanLoss += loss.cpu().detach().numpy()
 
             # Backward and optimize
@@ -309,7 +309,8 @@ with torch.no_grad():
 
 
             # loss = criterion(outputs.view(-1,6), label.view(-1))
-            loss = criterion(outputs, label, input)
+            # loss = criterion(outputs, label, input)
+            loss = val_loss(outputs, label)
             meanLoss += loss.cpu().detach().numpy()
 
             _, predicted = torch.max(outputs.data, 2)
