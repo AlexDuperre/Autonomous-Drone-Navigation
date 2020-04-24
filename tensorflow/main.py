@@ -17,6 +17,7 @@ from util.pytorchtools import EarlyStopping
 
 from util.tools import compute_paths
 from util.tools import display_paths
+from util.tools import dynamic_distribution
 
 from sklearn.metrics import confusion_matrix
 from util.confusion_matrix import plot_confusion_matrix
@@ -31,8 +32,8 @@ hyper_params = {
     "specific_lr" : 0.0001,
     "lr_scheduler_step" : 20,
     "num_epochs" : 50,
-    "input_dim" : 850,
-    "hidden_dim" : 1000,
+    "input_dim" : 200,
+    "hidden_dim" : 200,
     "layer_dim" : 1,
     "output_dim" : 5,
     "frame_nb" : 100,
@@ -107,7 +108,8 @@ model = model.cuda()
 # criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]).cuda())
 # criterion = FocalLoss(gamma=5)
 # criterion = nn.CrossEntropyLoss()
-criterion = weightedLoss()
+# criterion = weightedLoss()
+criterion = nn.KLDivLoss(reduction='batchmean')
 val_loss = pathLoss(frequency=10)
 
 # Optimzer
@@ -158,14 +160,16 @@ for epoch in range(hyper_params["num_epochs"]):
             inputA = depth[:,j,:,:,:].cuda()
             inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps)], -1).cuda()
             input = [inputA, inputB.float()]
-            label = labels[:,j,:].cuda()
+            label = dynamic_distribution(labels[:,j,:]).cuda()
 
             # Forward pass
             outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
             # loss = criterion(outputs.view(-1,6), label.view(-1))
-            loss = criterion(outputs, label, input)
-            # loss = criterion(outputs, label)
+            # custom loss
+            # loss = criterion(outputs, label, input)
+            # classic loss
+            loss = criterion(nn.functional.log_softmax(outputs,2), label)
             meanLoss += loss.cpu().detach().numpy()
 
             # Backward and optimize
@@ -175,7 +179,6 @@ for epoch in range(hyper_params["num_epochs"]):
 
             sub_segment_nb += 1
             experiment.log_metric("train_batch_loss", loss.item(), step=step+sub_segment_nb)
-
 
         if (i + 1) % 100 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
@@ -223,19 +226,20 @@ for epoch in range(hyper_params["num_epochs"]):
                                                rel_goaly[:, 0, 0, :].unsqueeze(1).repeat(1, depth.shape[2], 1) + eps)],
                                   -1).cuda()
                 input = [inputA, inputB.float()]
-                label = labels[:, j, :].cuda()
+                label = dynamic_distribution(labels[:,j,:]).cuda()
 
                 # Forward pass
                 outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
                 # loss = criterion(outputs.view(-1, 6), label.view(-1))
                 # loss = criterion(outputs, label, input)
-                loss = val_loss(outputs, label, epoch)
+                # loss = val_loss(outputs, label, epoch+1)
+                loss = criterion(nn.functional.log_softmax(outputs, 2), label)
 
                 meanLoss += loss.cpu().detach().numpy()
                 _, predicted = torch.max(outputs.data, 2)
                 total += len(label.view(-1))
-                correct += (predicted.view(-1) == label.view(-1)).sum().item()
+                correct += (predicted.view(-1) == labels[:,j,:].view(-1).cuda()).sum().item()
                 sub_segment_nb += 1
 
                 # predpts = compute_paths(rel_orientation[0, j, :, :].detach().numpy(),
@@ -301,16 +305,17 @@ with torch.no_grad():
             inputA = depth[:,j,:,:,:].cuda()
             inputB = torch.cat([rel_orientation[:,j,:,:], rel_goalx[:,j,:,:]/(rel_goalx[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps), rel_goaly[:,j,:,:]/(rel_goaly[:,0,0,:].unsqueeze(1).repeat(1,depth.shape[2],1)+eps)], -1).cuda()
             input = [inputA, inputB.float()]
-
-            label = labels[:,j,:].cuda()
+            label = dynamic_distribution(labels[:,j,:]).cuda()
 
             # Forward pass
             outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
 
             # loss = criterion(outputs.view(-1,6), label.view(-1))
-            loss = criterion(outputs, label, input)
+            # loss = criterion(outputs, label, input)
+            loss = criterion(nn.functional.log_softmax(outputs, 2), label)
             meanLoss += loss.cpu().detach().numpy()
+
 
             _, predicted = torch.max(outputs.data, 2)
 
@@ -318,7 +323,7 @@ with torch.no_grad():
             ground_truth = np.append(ground_truth,label.view(-1).cpu().detach().numpy())
 
             total += len(label.view(-1))
-            correct += (predicted.view(-1) == label.view(-1)).sum().item()
+            correct += (predicted.view(-1) == labels[:,j,:].view(-1).cuda()).sum().item()
 
             sub_segment_nb += 1
 

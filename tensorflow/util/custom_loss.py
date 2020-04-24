@@ -35,14 +35,16 @@ class pathLoss(nn.Module):
         super(pathLoss, self).__init__()
         self.fequency = frequency
         self.first_batch = True
-    def forward(self, outputs, labels, save=False):
+        self.current_epoch = 0
+
+    def forward(self, outputs, labels, save=123):
         _, predicted = torch.max(outputs.data, 2)
         predPts = compute_paths_means(predicted)
         truePts = compute_paths_means(labels)
 
         # Save 20 images of path if current epoch is a multiple of self.frequency AND first batch
         if (save % self.fequency == 0) & (self.first_batch):
-            for i in range(0,100,5):
+            for i in range(0,predicted.shape[0],5):
                 display_paths(
                     [[predPts[0][i].tolist(), predPts[1][i].tolist()], [truePts[0][i].tolist(), truePts[1][i].tolist()]],
                     save,

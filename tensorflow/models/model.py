@@ -21,9 +21,9 @@ class LSTMModel(nn.Module):
             self.densenet.load_state_dict((state_dict))
 
 
-        self.dense1 = nn.Linear(3,200)
+        self.dense1 = nn.Linear(3,50)
         self.relu = nn.ReLU()
-        self.dense2 = nn.Linear(200,400)
+        self.dense2 = nn.Linear(50,100)
 
         self.orientation_rep = nn.Sequential(
             self.dense1,
@@ -131,7 +131,7 @@ class ResCNN(nn.Module):
         self.avgpool = nn.AvgPool2d(3)
 
         self.fc1 = nn.Linear(960, 450)
-        self.fc2 =  nn.Linear(450, 450)
+        self.fc2 =  nn.Linear(450, 100)
         # self.fc3 = nn.Linear(150, 6)
 
         # Define layers

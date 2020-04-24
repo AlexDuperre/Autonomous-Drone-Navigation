@@ -161,13 +161,36 @@ def display_paths(sets, epoch, nb):
     plt.close()
 
 
+def dynamic_distribution(labels):
+    """
+    Creates a probability distribution of the targets by taking a sample of N/2 before timestep t and N/2 after.
+    For timesteps < N/2, the distribution will be made of the N-t elements after and the t elements before.
+    Idem for the N/2 timsteps at the end of the sequence.
+    """
+    batch_size, seq_len = labels.shape
+    dist = torch.zeros([batch_size,seq_len,5])
+    N_2 = 3
+    for i in range(seq_len):
+        if i < N_2:
+            dist[:, i, :] = calculate_stats(labels[:, 0 : 2*N_2+1])
+        elif i + N_2 > seq_len :
+            dist[:, i, :] = calculate_stats(labels[:, -2 * N_2-2 : -1])
+        else:
+            dist[:,i,:] = calculate_stats(labels[:,i-N_2:i+N_2])
+    return dist
+
+def calculate_stats(label_seq):
+    stats = torch.stack([(label_seq == 0).sum(1), (label_seq == 1).sum(1), (label_seq == 2).sum(1), (label_seq == 3).sum(1),
+                 (label_seq == 4).sum(1)], 1)
+    return stats/stats[0].sum().float()
+
+
 def main():
-    # goals = get_goals("../destinations.ods",1)
-    #
-    # goal = eval(goals[0])
-    # print(goal[0])
-    files = indexer("../dataset/ardrone_office/path_1_1_000.h5")
-    print(files)
+    labels = torch.randint(0,4,[100,33])
+    print(labels)
+    distrib = dynamic_distribution(labels)
+    print(distrib)
+    print(distrib.shape)
 
 if __name__ == '__main__':
     main()
