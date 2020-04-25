@@ -113,9 +113,10 @@ val_loss = pathLoss(frequency=10)
 # Optimzer
 optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hyper_params["specific_lr"]},
                               {"params": model.lstm.parameters()},
-                              {"params": model.fc.parameters()}],
-                             lr=hyper_params["learning_rate"],
-                             weight_decay=0.01)
+                              {"params": model.fc.parameters()},
+                              {"params": model.orientation_rep.parameters(), "lr": hyper_params["specific_lr"]}],
+                              lr=hyper_params["learning_rate"],
+                              weight_decay=0.01)
 
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=hyper_params["lr_scheduler_step"], gamma=0.1)
 
@@ -195,6 +196,7 @@ for epoch in range(hyper_params["num_epochs"]):
         total = 0
         sub_segment_nb = 0
         meanLoss = 0
+        meanLoss1 = 0
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, path) in enumerate(valid_loader):
             actual_subsegment_nb = int(depth.shape[1] / hyper_params["frame_nb"])
             depth = depth.view(depth.shape[0], actual_subsegment_nb, hyper_params["frame_nb"], depth.shape[2],
@@ -229,10 +231,11 @@ for epoch in range(hyper_params["num_epochs"]):
                 outputs, (hn, cn) = model(input, hn.detach(), cn.detach())
 
                 # loss = criterion(outputs.view(-1, 6), label.view(-1))
-                # loss = criterion(outputs, label, input)
+                loss1 = criterion(outputs, label, input)
                 loss = val_loss(outputs, label, epoch)
 
                 meanLoss += loss.cpu().detach().numpy()
+                meanLoss1 += loss1.cpu().detach().numpy()
                 _, predicted = torch.max(outputs.data, 2)
                 total += len(label.view(-1))
                 correct += (predicted.view(-1) == label.view(-1)).sum().item()
@@ -256,6 +259,7 @@ for epoch in range(hyper_params["num_epochs"]):
         validLoss.append(meanLoss / len(valid_loader))
         validAcc.append(acc)
         experiment.log_metric("valid_epoch_loss", meanLoss / sub_segment_nb, step=epoch)
+        experiment.log_metric("valid_epoch_loss1", meanLoss1 / sub_segment_nb, step=epoch)
         experiment.log_metric("valid_epoch_accuracy", acc, step=epoch)
 
     # Adjust learning rate
