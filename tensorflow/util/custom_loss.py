@@ -35,6 +35,7 @@ class pathLoss(nn.Module):
         super(pathLoss, self).__init__()
         self.fequency = frequency
         self.first_batch = True
+        self.current_epoch = 0
     def forward(self, outputs, labels, save=False):
         _, predicted = torch.max(outputs.data, 2)
         predPts = compute_paths_means(predicted)

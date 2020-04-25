@@ -31,8 +31,8 @@ hyper_params = {
     "specific_lr" : 0.0001,
     "lr_scheduler_step" : 20,
     "num_epochs" : 50,
-    "input_dim" : 850,
-    "hidden_dim" : 1000,
+    "input_dim" : 50,
+    "hidden_dim" : 25,
     "layer_dim" : 1,
     "output_dim" : 5,
     "frame_nb" : 100,
@@ -53,7 +53,7 @@ early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
 
-dataset = DND("C:/aldupd/DND/light dataset V2/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("C:/aldupd/DND/Smaller depth None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
 val_test_set = DND("C:/aldupd/DND/val-test set/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
@@ -115,8 +115,8 @@ optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hype
                               {"params": model.lstm.parameters()},
                               {"params": model.fc.parameters()},
                               {"params": model.orientation_rep.parameters(), "lr": hyper_params["specific_lr"]}],
-                              lr=hyper_params["learning_rate"],
-                              weight_decay=0.01)
+                            lr=hyper_params["learning_rate"],
+                             weight_decay=0.01)
 
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=hyper_params["lr_scheduler_step"], gamma=0.1)
 
