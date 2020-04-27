@@ -18,9 +18,9 @@ hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
     "batch_size" : 1,
-    "learning_rate" : 0.001,
-    "lr_scheduler_step" : 4,
-    "num_epochs" : 15,
+    "learning_rate" : 0.0001,
+    "lr_scheduler_step" : 9,
+    "num_epochs" : 20,
     "frame_nb" : 100,
     "sub_segment_nb": 1,
     "segment_overlap": 0,
@@ -33,7 +33,7 @@ hyper_params = {
 
 # Initialize the dataset
 # dataset = DND("/media/aldupd/UNTITLED 2/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
-dataset = DND("C:/aldupd/dataset/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"])
+dataset = DND("C:/aldupd/DND/val-test set", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"])
 print("Dataset length: ", dataset.__len__())
 
 

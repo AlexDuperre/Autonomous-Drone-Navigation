@@ -17,14 +17,19 @@ class LSTMModel(nn.Module):
 
         self.densenet = ResCNN()
         if Pretrained:
-            state_dict = torch.load('./Best_models/Autoencoder/5/checkpoint.pt')
+            state_dict = torch.load('ResCNN_model.pt')
+            self.densenet.load_state_dict((state_dict))
 
-            prefix = "Encoder."
-            n_clip = len(prefix)
-            adapted_dict = {k[n_clip:]: v for k, v in state_dict.items()
-                            if k.startswith(prefix)}
-            self.densenet.load_state_dict(adapted_dict)
 
+        self.dense1 = nn.Linear(3,200)
+        self.relu = nn.ReLU()
+        self.dense2 = nn.Linear(200,400)
+
+        self.orientation_rep = nn.Sequential(
+            self.dense1,
+            self.relu,
+            self.dense2
+        )
 
         ############################################
         #LSTM
@@ -67,8 +72,9 @@ class LSTMModel(nn.Module):
         featuresA = featuresA.reshape(batch_size, seq_length,-1)
 
         # Concatenate features together
-        featuresB = x[1]
-        Features = featuresA #torch.cat([featuresA, featuresB.type(torch.float)], dim=2)
+        featuresB = self.orientation_rep(x[1][:,:,:].reshape(batch_size*seq_length,-1))
+        featuresB = featuresB.reshape(batch_size,seq_length,-1)
+        Features = torch.cat([featuresA, featuresB.type(torch.float)], dim=2) #redondant float
 
         # Representation of the input
         # out = self.fc1(Features)
@@ -98,26 +104,34 @@ class ResCNN(nn.Module):
     def __init__(self):
         super(ResCNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(1,16, 5)
-        self.batchNorm1 = nn.BatchNorm2d(16)
-        self.relu1 = nn.Tanh()#nn.ReLU()
-        self.avgpool1 = nn.AvgPool2d(2)
+        self.conv1 = nn.Conv2d(1,64,7,3)
+        self.batchNorm1 = nn.BatchNorm2d(64)
+        self.relu1 = nn.ReLU()
+        self.maxpool = nn.MaxPool2d(3)
 
 
-        self.conv2 = nn.Conv2d(16, 32,5)
-        self.batchNorm2 = nn.BatchNorm2d(32)
-        self.relu2 = nn.Tanh()#nn.ReLU()
+        self.conv2 = nn.Conv2d(64, 64, 3, 1, 1)
+        self.batchNorm2 = nn.BatchNorm2d(64)
+        self.relu2 = nn.ReLU()
 
 
-        self.conv3 = nn.Conv2d(32, 32, 3)
-        self.batchNorm3 = nn.BatchNorm2d(32)
-        self.relu3 = nn.Tanh()#nn.ReLU()
-        self.avgpool2 = nn.AvgPool2d(2)
+        self.conv3 = nn.Conv2d(64, 64, 3, 1, 1)
+        self.batchNorm3 = nn.BatchNorm2d(64)
+        self.relu3 = nn.ReLU()
 
 
-        self.fc1 = nn.Linear(23040, 5000)
-        self.relu4 = nn.Tanh()#nn.ReLU()
-        self.fc2 =  nn.Linear(5000, 450)
+        self.conv4 = nn.Conv2d(64, 64, 3, 1, 1)
+        self.batchNorm4 = nn.BatchNorm2d(64)
+        self.relu4 = nn.ReLU()
+
+
+        self.conv5 = nn.Conv2d(64, 64, 3, 1, 1)
+        self.batchNorm5 = nn.BatchNorm2d(64)
+        self.relu5 = nn.ReLU()
+        self.avgpool = nn.AvgPool2d(3)
+
+        self.fc1 = nn.Linear(960, 450)
+        self.fc2 =  nn.Linear(450, 450)
         # self.fc3 = nn.Linear(150, 6)
 
         # Define layers
@@ -125,37 +139,42 @@ class ResCNN(nn.Module):
             self.conv1,
             self.batchNorm1,
             self.relu1,
-            self.avgpool1
+            self.maxpool
         )
 
         self.layer2 = nn.Sequential(
             self.conv2,
             self.batchNorm2,
-            self.relu2
+            self.relu2,
+            self.conv3,
+            self.batchNorm3
         )
 
         self.layer3 = nn.Sequential(
-            self.conv3,
-            self.batchNorm3,
             self.relu3,
-            self.avgpool2
+            self.conv4,
+            self.batchNorm4,
+            self.relu4,
+            self.conv5,
+            self.batchNorm5
         )
 
         self.layer4 = nn.Sequential(
-            Squeeze(),
-            self.fc1,
-            self.relu4,
-            self.fc2
+            self.relu5,
+            self.avgpool
+
         )
 
     def forward(self,x):
 
         out1 = self.layer1(x)
         out2 = self.layer2(out1)
-        out3 = self.layer3(out2)
-        out4 = self.layer4(out3)
-
-        return out4
+        out3 = self.layer3(out1+out2)
+        out4 = self.layer4(out2+out3)
+        out5 = self.fc1(out4.view(x.shape[0], -1))
+        out6 = self.fc2(out5)
+        # out7 = self.fc3(out6)
+        return out6
 
 class Squeeze(nn.Module):
     def __init__(self, *args):

@@ -17,14 +17,14 @@ from GPUtil import showUtilization as gpu_usage
 hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
-    "batch_size" : 6,
-    "learning_rate" : 0.001,
-    "lr_scheduler_step" : 10,
+    "batch_size" : 12,
+    "learning_rate" : 0.0001,
+    "lr_scheduler_step" : 9,
     "num_epochs" : 25,
     "frame_nb" : 100,
     "sub_segment_nb": 1,
     "segment_overlap": 0,
-    "patience" : 14,
+    "patience" : 15,
 }
 
 
@@ -37,22 +37,25 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("C:/aldupd/dataset/Smaller depth None free", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+dataset = DND("C:/aldupd/DND/Smaller depth None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+
+val_test_set = DND("C:/aldupd/DND/val-test set/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+
 print("Dataset length: ", dataset.__len__())
 
 
 
 # Sending to loader
-# torch.manual_seed(0)
+# train sampler
 indices = torch.randperm(len(dataset))
-train_indices = indices[:len(indices) - int((hyper_params["validationRatio"]) * len(dataset))]
-train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_indices)
+# train_indices = indices[:len(indices) - int((hyper_params["validationRatio"]) * len(dataset))]
+train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices)
 
-valid_train_indices = indices[len(indices) - int(hyper_params["validationRatio"] * len(dataset)):]
-valid_indices = valid_train_indices[:len(valid_train_indices) - int((hyper_params["validationTestRatio"]) * len(valid_train_indices))]
+indices = torch.randperm(len(val_test_set))
+valid_indices = indices[:len(indices) - int(hyper_params["validationRatio"] * len(val_test_set))]
 valid_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_indices)
 
-test_indices =  valid_train_indices[len(valid_train_indices) - int(hyper_params["validationTestRatio"] * len(valid_train_indices)):]
+test_indices =  indices[len(indices) - int(hyper_params["validationRatio"] * len(val_test_set)):]
 test_sampler = torch.utils.data.sampler.SubsetRandomSampler(test_indices)
 
 
@@ -61,12 +64,12 @@ train_loader = torch.utils.data.DataLoader(dataset=dataset,
                                            sampler = train_sampler,
                                            shuffle=False,
                                            num_workers=0)
-valid_loader = torch.utils.data.DataLoader(dataset=dataset,
+valid_loader = torch.utils.data.DataLoader(dataset=val_test_set,
                                            batch_size=hyper_params["batch_size"],
                                            sampler=valid_sampler,
                                            shuffle=False,
                                            num_workers=0)
-test_loader = torch.utils.data.DataLoader(dataset=dataset,
+test_loader = torch.utils.data.DataLoader(dataset=val_test_set,
                                           batch_size=hyper_params["batch_size"],
                                           sampler=test_sampler,
                                           shuffle=False,
