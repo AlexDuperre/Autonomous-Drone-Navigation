@@ -203,7 +203,7 @@ def predict(model_data_path):
                     prev_command = torch.from_numpy((prev_command == np.arange(5))).unsqueeze(0).unsqueeze(0).float()
                     relx = torch.from_numpy(np.array(rel_destination[0]/xini)).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
                     rely = torch.from_numpy(np.array(rel_destination[1]/yini)).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
-                    lstm_inputB = torch.cat([orientation, relx,rely],-1)
+                    lstm_inputB = torch.cat([orientation, relx,rely, prev_command],-1)
                     out, (hn, cn) = model([lstm_inputA, lstm_inputB], hn, cn)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
