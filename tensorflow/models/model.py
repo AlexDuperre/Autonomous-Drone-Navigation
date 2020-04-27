@@ -17,11 +17,15 @@ class LSTMModel(nn.Module):
 
         self.densenet = ResCNN()
         if Pretrained:
-            state_dict = torch.load('ResCNN_model.pt')
-            self.densenet.load_state_dict((state_dict))
+            state_dict = torch.load("./Best_models/old/prev_comm 2/checkpoint.pt")
+            prefix = "densenet."
+            n_clip = len(prefix)
+            adapted_dict = {k[n_clip:]: v for k, v in state_dict.items()
+                            if k.startswith(prefix)}
+            self.densenet.load_state_dict(adapted_dict)
 
 
-        self.dense1 = nn.Linear(4,200)
+        self.dense1 = nn.Linear(8,200)
         self.relu = nn.Tanh()
         self.dense2 = nn.Linear(200,400)
 
