@@ -21,8 +21,8 @@ class LSTMModel(nn.Module):
             self.densenet.load_state_dict((state_dict))
 
 
-        self.dense1 = nn.Linear(3,200)
-        self.relu = nn.ReLU()
+        self.dense1 = nn.Linear(4,200)
+        self.relu = nn.Tanh()
         self.dense2 = nn.Linear(200,400)
 
         self.orientation_rep = nn.Sequential(
