@@ -19,7 +19,7 @@ hyper_params = {
     "validationTestRatio" : 0.5,
     "batch_size" : 12,
     "learning_rate" : 0.0001,
-    "lr_scheduler_step" : 9,
+    "lr_scheduler_step" : 7,
     "num_epochs" : 25,
     "frame_nb" : 100,
     "sub_segment_nb": 1,
@@ -37,9 +37,13 @@ experiment.log_parameters(hyper_params)
 early_stopping = EarlyStopping(patience=hyper_params["patience"], verbose=True)
 
 # Initialize the dataset
-dataset = DND("C:/aldupd/DND/Smaller depth None free/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+transformation = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.1792,), (0.1497,)),
+])
+dataset = DND("C:/aldupd/DND/Smaller depth None free/", transform=transformation, frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
-val_test_set = DND("C:/aldupd/DND/val-test set/", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
+val_test_set = DND("C:/aldupd/DND/val-test set/", transform=transformation, frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"]) #/media/aldupd/UNTITLED 2/dataset
 
 print("Dataset length: ", dataset.__len__())
 
@@ -129,7 +133,7 @@ for epoch in range(hyper_params["num_epochs"]):
         experiment.log_metric("train_batch_loss", loss.item(), step=step+i+1)
 
 
-        if (i + 1) % 1000 == 0:
+        if (i + 1) % 50 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                   .format(epoch + 1, hyper_params["num_epochs"], i + 1, total_step, loss.item()))
 
@@ -160,6 +164,19 @@ for epoch in range(hyper_params["num_epochs"]):
             # _, predicted = torch.max(outputs.data, 1)
             # total += len(labels.view(-1))
             # correct += (predicted.view(-1) == labels.view(-1)).sum().item()
+
+            outputs = outputs.detach().cpu().numpy()
+            depth = depth.detach().cpu().numpy()
+
+            plt.subplot2grid((2, 1), (0, 0))
+            plt.imshow(depth[1][0])
+
+            plt.subplot2grid((2, 1), (1, 0))
+            plt.imshow(outputs[1][0])
+
+            plt.savefig("./val paths/autoencoder_" + str(i) + ".png")
+
+
 
 
 
@@ -198,7 +215,6 @@ with torch.no_grad():
         # Forward pass
         outputs = model(depth)
 
-
         loss = criterion(outputs, depth)
         meanLoss += loss.cpu().detach().numpy()
 
@@ -207,15 +223,15 @@ with torch.no_grad():
         # predictions = np.append(predictions,predicted.view(-1).cpu().detach().numpy())
         # ground_truth = np.append(ground_truth,labels.view(-1).cpu().detach().numpy())
 
-        total += len(labels.view(-1))
+        # total += len(labels.view(-1))
         # correct += (predicted.view(-1) == labels.view(-1)).sum().item()
 
-        sub_segment_nb += 1
+        # sub_segment_nb += 1
 
     # test_acc = 100 * correct / total
     print('Test Loss : {:.4f}'.format( meanLoss / (i+1)))
 
-# Logging reults
+# Logging results
 experiment.log_metric("test_loss", meanLoss / (i+1), step=epoch)
 # experiment.log_metric("test_accuracy", acc, step=epoch)
 
@@ -243,4 +259,4 @@ experiment.log_metric("test_loss", meanLoss / (i+1), step=epoch)
 #     "test_acc" : test_acc
 # }
 
-experiment.send_notification("finished", "ok tamere", dict)
+# experiment.send_notification("finished", "ok tamere", dict)

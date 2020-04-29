@@ -58,8 +58,8 @@ class DND(Dataset):
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-        # if self.transform:
-        #     image = self.transform(image)
+        if self.transform:
+            image = self.transform(depth)
 
         return (depth, rel_orientation, rel_goalx, rel_goaly, GT.astype(int)-1)
 
