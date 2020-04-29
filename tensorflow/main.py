@@ -27,10 +27,10 @@ hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
     "batch_size" : 100,
-    "learning_rate" : 0.001,
+    "learning_rate" : 0.0001,
     "specific_lr" : 0.0001,
-    "lr_scheduler_step" : 15,
-    "num_epochs" : 40,
+    "lr_scheduler_step" : 20,
+    "num_epochs" : 35,
     "input_dim" : 850,
     "hidden_dim" : 1000,
     "layer_dim" : 1,
@@ -38,7 +38,7 @@ hyper_params = {
     "frame_nb" : 100,
     "sub_segment_nb": 1,
     "segment_overlap": 0,
-    "patience" : 50,
+    "patience" : 15,
     "skip_frames" : 3
 }
 
@@ -99,7 +99,7 @@ model = LSTMModel(input_dim=hyper_params["input_dim"],
                   hidden_dim=hyper_params["hidden_dim"],
                   layer_dim=hyper_params["layer_dim"],
                   output_dim=hyper_params["output_dim"],
-                  Pretrained=True)
+                  Pretrained=False)
 model = model.cuda()
 
 # LOSS
