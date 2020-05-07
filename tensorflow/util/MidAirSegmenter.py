@@ -29,13 +29,18 @@ class TrajectorySegmenter:
 
         elif len(sequence_length_range) == 1:
             if sequence_length_range[0]>trajectory_length:
+                ## Divide sequences in sub sequences
                 # start_frames = [0]
                 # sequence_lengths = trajectory_length//subsequence_frame_nb[0] * subsequence_frame_nb[0]
                 # print(sequence_lengths)
                 # if trajectory_length//subsequence_frame_nb[0] == 0:
                 #     print("###########sequence too small#############")
-                dataframe = pd.DataFrame([])
+                # dataframe = pd.DataFrame([])
                 print("dropped trajectory, length of: ",trajectory_length)
+                sequence_lengths = trajectory_length
+                start_frames = [0]
+                sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
+                dataframe = pd.DataFrame(sequence)
             else:
                 start_frames = list(
                     range(0, trajectory_length - sequence_length_range[0], sequence_length_range[0] - overlap))
@@ -46,6 +51,7 @@ class TrajectorySegmenter:
 
                 sequence_lengths = [sequence_length_range[0]] * len(start_frames)
 
+                ## Use droppd frams to create sub sequences:
                 # if dropped_frames//subsequence_frame_nb[0] > 0:
                 #     start_frames.append(start_frames[-1]+sequence_length_range[0])
                 #     sequence_lengths.append(dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0])
@@ -54,6 +60,14 @@ class TrajectorySegmenter:
                 # if dropped_frames > 0:
                 #     print("Last {} frames not used for trajectory {}".format(dropped_frames,
                 #                                                              trajectory))
+
+                if (dropped_frames > 0) & (dropped_frames > 0.6*sequence_length_range[0]):
+                    start_frames.append(start_frames[-1]+sequence_length_range[0])
+                    sequence_lengths.append(dropped_frames)
+                elif (dropped_frames > 0) & (dropped_frames < 0.6*sequence_length_range[0]):
+                    start_frames.append(trajectory_length-sequence_length_range[0])
+                    sequence_lengths.append(sequence_length_range[0])
+
 
 
                 sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
@@ -101,6 +115,7 @@ class DNDSegmenter(TrajectorySegmenter):
             for name in files:
                 if name.endswith(".h5"):
                     path = os.path.join(root,name).replace('\\','/')
+                    print(path)
                     datasets = h5py.File(path, "r+")
                     trajectory_length = self.__get_trajectory_length__(datasets)
                     segments = self.segment_trajectory(overlap, subsequence_frame_nb, subsequence_nb,

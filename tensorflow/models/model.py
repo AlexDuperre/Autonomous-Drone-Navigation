@@ -17,15 +17,15 @@ class LSTMModel(nn.Module):
 
         self.densenet = ResCNN()
         if Pretrained:
-            state_dict = torch.load("./Best_models/old/prev_comm 2/checkpoint.pt")
-            prefix = "densenet."
+            state_dict = torch.load("./Best_models/Autoencoder/8/checkpoint.pt")
+            prefix = "Encoder."
             n_clip = len(prefix)
             adapted_dict = {k[n_clip:]: v for k, v in state_dict.items()
                             if k.startswith(prefix)}
             self.densenet.load_state_dict(adapted_dict)
 
 
-        self.dense1 = nn.Linear(3,200)
+        self.dense1 = nn.Linear(2,200)
         self.relu = nn.Tanh()
         self.dense2 = nn.Linear(200,400)
 
@@ -67,33 +67,35 @@ class LSTMModel(nn.Module):
 
         )
 
-    def forward(self, x, hn, cn):
+    def forward(self, x, lengths):
         batch_size, seq_length, height, width = x[0].shape
 
         images = x[0].reshape(batch_size*seq_length, height, width)
         images = images.unsqueeze(dim=1)
-        featuresA = self.densenet(images)
+        featuresA = self.densenet(images.float())
         featuresA = featuresA.reshape(batch_size, seq_length,-1)
 
         # Concatenate features together
-        featuresB = self.orientation_rep(x[1][:,:,:].reshape(batch_size*seq_length,-1))
+        featuresB = self.orientation_rep(x[1].reshape(batch_size*seq_length,-1))
         featuresB = featuresB.reshape(batch_size,seq_length,-1)
-        Features = torch.cat([featuresA, featuresB.type(torch.float)], dim=2) #redondant float
+        Features = torch.cat([featuresA, featuresB], dim=2) #redondant float
 
-        # Representation of the input
-        # out = self.fc1(Features)
-        # out = self.fc2(out)
+        # pad shorter sequences
+        Features = torch.nn.utils.rnn.pack_padded_sequence(Features,lengths, enforce_sorted=False, batch_first=True)
 
         # Initialize hidden state with zeros
-        # h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
-        #
-        # # Initialize cell state
-        # c0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+        h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+
+        # Initialize cell state
+        c0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
 
         # One time step
         # We need to detach as we are doing truncated backpropagation through time (BPTT)
         # If we don't, we'll backprop all the way to the start even after going through another batch
-        out, (hn, cn) = self.lstm(Features, (hn, cn))
+        out, (hn, cn) = self.lstm(Features, (h0.detach(), c0.detach()))
+
+        # pad packed sequence
+        out, _ = torch.nn.utils.rnn.pad_packed_sequence(out, batch_first=True)
 
         # Index hidden state of last time step
         # out.size() --> 100, 28, 100

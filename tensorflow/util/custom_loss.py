@@ -4,28 +4,28 @@ from util.tools import display_paths
 class weightedLoss(nn.Module):
     def __init__(self):
         super(weightedLoss, self).__init__()
-        self.crossentropy = nn.CrossEntropyLoss(weight=torch.Tensor([0.8213502735, 3, 2, 4.3366425512, 4.3308459881]).cuda(),reduction="none") #[0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]
-
-    def sample_weighter(self, depth):
+        self.crossentropy = nn.CrossEntropyLoss(weight=torch.Tensor([1, 2, 2, 3, 3]).cuda(), reduction="none") #[0.0684208353, 0.0213502735, 0.1260713329, 0.116669019, 0.3366425512, 0.3308459881]
+        self.eps = 0.00001
+    def sample_weighter(self, depth, mask):
         batch, frame_nb, _, _ = depth.shape
         medians, _ = depth.view(batch, frame_nb, -1).median(dim=2)
-        cond = medians <= 0.16
+        cond = medians <= 0.10
         weights = torch.zeros(medians.shape).cuda()
-        weights[cond] = torch.ones(medians.shape)[cond].cuda() - torch.div(medians[cond],0.2)
+        weights[cond] = torch.ones(medians.shape)[cond].cuda() - torch.div(medians[cond],0.2).float()
         weights += torch.ones(medians.shape).cuda()
-        weights = weights**4
+        weights = (weights**4)*mask
         weights = weights / weights.sum()
         return weights.cuda()
 
 
-    def forward(self, outputs, targets, input):
-        weights = self.sample_weighter(input[0]).view(-1)
+    def forward(self, outputs, targets, input, mask):
+        weights = self.sample_weighter(input[0], mask.cuda()).view(-1)
 
-        Distance_loss  = 2.0*torch.sqrt(input[1][:,:,1]**2 + input[1][:,:,2]**2).view(-1)
+        Distance_loss  = (input[1][:,:,1]/(input[1][:,0,1].unsqueeze(1)+self.eps)).view(-1)
 
-        Orientation_loss = 2.0*(input[1][:,:,0]**2).view(-1)
+        Orientation_loss = torch.abs(input[1][:,:,0]).view(-1)
 
-        losses = self.crossentropy(outputs.view(-1, outputs.shape[-1]), targets.view(-1)) + Distance_loss + Orientation_loss
+        losses = self.crossentropy(outputs.view(-1, outputs.shape[-1]), targets.view(-1)) + Orientation_loss + Distance_loss
         loss = (losses * weights).sum()
 
         return loss
@@ -43,7 +43,7 @@ class pathLoss(nn.Module):
 
         # Save 20 images of path if current epoch is a multiple of self.frequency AND first batch
         if (save % self.fequency == 0) & (self.first_batch):
-            for i in range(0,100,5):
+            for i in range(0,outputs.shape[0],5):
                 display_paths(
                     [[predPts[0][i].tolist(), predPts[1][i].tolist()], [truePts[0][i].tolist(), truePts[1][i].tolist()]],
                     save,

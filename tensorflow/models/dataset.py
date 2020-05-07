@@ -12,24 +12,36 @@ import random
 from util.MidAirSegmenter import DNDSegmenter
 
 class DND(Dataset):
-    def __init__(self, data_dir, transform = None, frames_nb=30, subsegment_nb=1, overlap=20):
+    def __init__(self, data_dir, transform = None, frames_nb=30, subsegment_nb=1, overlap=20, goal_chg=False):
+        self.frame_nb = frames_nb
         data_segmenter = DNDSegmenter(data_dir)
-        self.Table = data_segmenter.segment((frames_nb,), overlap,subsegment_nb)
+        self.Table = data_segmenter.segment((self.frame_nb,), overlap,subsegment_nb)
         random.shuffle(self.Table)
         self.Table = self.Table[0:int(len(self.Table)*1)]
-
+        self.goal_chg = goal_chg
         self.transform = transform
 
     def __getitem__(self, idx):
+        # initialize inputs:
+        depth = np.zeros((self.frame_nb,96,160))
+        rel_orientation = np.zeros((self.frame_nb))
+        rel_goalx = np.zeros((self.frame_nb))
+        rel_goaly = np.zeros((self.frame_nb))
+        goal_orientation = np.zeros((self.frame_nb))
+        GT = np.ones((self.frame_nb))
+        mask = np.zeros((self.frame_nb))
+
         segment = self.Table[idx][0]
         path = self.Table[idx][1]
         f = h5py.File(path, "r")
-        depth = f["depth"][segment[1]:segment[1]+segment[0]]
-        rel_orientation = f["rel_orientation"][segment[1]:segment[1]+segment[0]]
-        rel_goalx = f["rel_goalx"][segment[1]:segment[1]+segment[0]]
-        rel_goaly = f["rel_goaly"][segment[1]:segment[1]+segment[0]]
-        goal_orientation = f["goal_orientation"][segment[1]:segment[1] + segment[0]]
-        GT = f["GT"][segment[1]:segment[1] + segment[0]]
+        length = len(f["GT"][segment[1]:segment[1] + segment[0]])
+        depth[0:length, :,:] = f["depth"][segment[1]:segment[1]+segment[0]]
+        rel_orientation[0:length] = f["rel_orientation"][segment[1]:segment[1]+segment[0]]
+        rel_goalx[0:length] = f["rel_goalx"][segment[1]:segment[1]+segment[0]]
+        rel_goaly[0:length] = f["rel_goaly"][segment[1]:segment[1]+segment[0]]
+        goal_orientation [0:length] = f["goal_orientation"][segment[1]:segment[1] + segment[0]]
+        GT[0:length] = f["GT"][segment[1]:segment[1] + segment[0]]
+        mask[0:length] = 1
 
         # test frames
         Testframes = False
@@ -37,14 +49,15 @@ class DND(Dataset):
             for i in range(len(GT)):
                 image = depth[i]
                 rel_goal = rel_goalx[i], rel_goaly[i]
-                image = display_trajectory(image, rel_goal, fix_angle(rel_orientation[i]))
+                image = display_trajectory(image, rel_goal, fix_angle(np.pi*rel_orientation[i]))
                 cv2.imshow("Depth", image)
-                cv2.waitKey(1000)
+                cv2.waitKey(200)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-        if False:
+        if (np.random.random()>0.4) & self.goal_chg:
             rel_orientation, rel_goalx, rel_goaly = destination_swap(rel_orientation, rel_goalx, rel_goaly, goal_orientation)
+
 
 
         # test frames
@@ -52,16 +65,16 @@ class DND(Dataset):
             for i in range(len(GT)):
                 image = depth[i]
                 rel_goal = rel_goalx[i], rel_goaly[i]
-                image = display_trajectory(image, rel_goal, rel_orientation[i])
+                image = display_trajectory(image, rel_goal, np.pi*rel_orientation[i])
                 cv2.imshow("Depth", image)
-                cv2.waitKey(1000)
+                cv2.waitKey(200)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-        # if self.transform:
-        #     image = self.transform(image)
+        if self.transform:
+            image = self.transform(depth)
 
-        return (depth, rel_orientation, rel_goalx, rel_goaly, GT.astype(int)-1, path)
+        return (depth, rel_orientation, rel_goalx, rel_goaly, GT.astype(int)-1, length, mask)
 
     def __len__(self):
         return len(self.Table)
@@ -80,10 +93,12 @@ def destination_swap(rel_orientation, rel_goalx, rel_goaly, goal_orientation):
             new_goal_orientation = new_goal_orientation + 2 * np.pi
 
         # makes sure the angle is between pi and - pi
-        if goal_orientation[i] > np.pi:
-            goal_orientation[i] = -1.0 * (2 * np.pi - goal_orientation[i])
+        if goal_orientation[i] < 0:
+            goal_orientation[i] = goal_orientation[i] + 2 * np.pi
+
+
         # Calculate current orientation
-        current_orientation = np.pi*rel_orientation[i] + goal_orientation[i]
+        current_orientation = -np.pi*rel_orientation[i] + goal_orientation[i]
         if current_orientation < 0:
             current_orientation = current_orientation + 2 * np.pi
 
