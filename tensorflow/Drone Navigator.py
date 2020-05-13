@@ -155,6 +155,12 @@ def predict(model_data_path):
         dt = 0
         t0 = 1e-18
         prev_command = 0
+        mask = torch.zeros([1,1,92,160])
+        mask[0,0,32:64,53:106] = 1
+        trajectoryx = []
+        trajectoryy = []
+        collisionx = []
+        collisiony = []
         while running:
             # Measuring time t1
             # t1 = time.time()
@@ -166,6 +172,9 @@ def predict(model_data_path):
             if len(split_data[3].split('.')) > 2:
                 var = split_data[3].split('.')
                 split_data[3] = var[0] + '.' + var[1][0:3]
+
+            collision = split_data[4]
+            split_data = split_data[0:4]
 
             # Calculate relative position and arrow angle
             rel_orientation, display_angle, rel_destination, destination_orientation = telemetry_transform(destination, split_data)
@@ -187,7 +196,6 @@ def predict(model_data_path):
 
             if auto_navigating == True:
                 image = cv2.putText(image, 'Auto Navigating', (0, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255))
-                # batch.append([pred[0,:,:,0], img, float("%.3f"%(rel_destination[0])), float("%.3f"%(rel_destination[1])), float("%.3f"%(destination_orientation)), float("%.3f"%(rel_orientation)), np.string_(keyloggerFct.key)])
 
                 calls += 1
 
@@ -197,14 +205,14 @@ def predict(model_data_path):
                         yini = rel_destination[1]
 
                     print(fix_angle(rel_orientation))
-                    depth = cv2.resize(pred[0,:,:,0], dsize=(160, 92), interpolation=cv2.INTER_CUBIC)
-                    lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
+                    depth = cv2.resize((pred[0,:,:,0]), dsize=(160, 92), interpolation=cv2.INTER_CUBIC) #-0.1792)/0.1497
+                    lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)#*mask #************************
                     orientation = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
                     prev_command = torch.from_numpy((prev_command == np.arange(5))).unsqueeze(0).unsqueeze(0).float()
-                    relx = torch.from_numpy(np.array(rel_destination[0]/xini)).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
-                    rely = torch.from_numpy(np.array(rel_destination[1]/yini)).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
-                    lstm_inputB = torch.cat([orientation, relx,rely, prev_command],-1)
-                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], hn, cn)
+                    relx = torch.from_numpy(np.array(rel_destination[0])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
+                    rely = torch.from_numpy(np.array(rel_destination[1])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
+                    lstm_inputB = torch.cat([orientation,torch.sqrt(relx**2 + rely**2)],-1)
+                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], torch.ones([1]), hn, cn) #torch.sqrt(relx**2 + rely**2)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
                     prev_command = predicted
@@ -214,6 +222,16 @@ def predict(model_data_path):
                     # makes sure we are in the drone commande window
                     # subprocess.call(['./activate_window.sh'])
 
+                    # create trajectory
+                    x_abs = 10 - destination[1] + rely.view(-1)
+                    y_abs = 1 + destination[0] - relx.view(-1)
+                    trajectoryx.append(x_abs.tolist())
+                    trajectoryy.append(y_abs.tolist())
+
+                    if collision == '1':
+                        print('collision')
+                        collisionx.append(x_abs.tolist())
+                        collisiony.append(y_abs.tolist())
 
                     if predicted == 0:
                         print("w")
@@ -283,10 +301,43 @@ def predict(model_data_path):
             # print(keyloggerFct.key)
 
             # if statment for auto_navigating flight
-            if (keyloggerFct.key == 'space') & (auto_navigating == True):
+            if (keyloggerFct.key == 'space')  or (np.sqrt(rel_destination[0]**2 + rel_destination[1]**2) < 0.5):
+                pyautogui.keyUp("w")
+                pyautogui.keyUp("q")
+                pyautogui.keyUp("e")
+
+                # Calculate distance
+                dist = 0
+                for i in range(len(trajectoryx)-1):
+                    dist += np.sqrt((trajectoryx[i+1][0]-trajectoryx[i][0])**2 + (trajectoryy[i+1][0]-trajectoryy[i][0])**2)
 
 
-                batch = []
+                # save trajectory
+                base = "../Test_paths/ardrone_bar/GT/" + "path_" + str(last_destination_id + 1) + "_" + str(destination_id + 1)
+                if not os.path.exists(base):
+                    os.makedirs(base)
+
+                background = plt.imread("./Test_paths/ardrone_bar_raw.png")
+
+                plt.imshow(background, extent=[0, 22, 0, 11])
+
+                plt.plot(trajectoryx,trajectoryy, "bo-")
+
+                if collisionx:
+                    plt.plot(collisionx,collisiony, 'yo')
+                    print(collisiony)
+
+                plt.axis([0, 22, 0, 12])
+
+                plt.savefig(base + "/dist_" + str(np.around(dist,3)) + "_.png", dpi=450, transparent=True)
+                plt.clf()
+
+
+                trajectoryx = []
+                trajectoryy = []
+                collisionx = []
+                collisiony = []
+
                 auto_navigating = False
                 # save last destination and get new destination
                 last_destination_id = destination_id
@@ -329,9 +380,6 @@ def predict(model_data_path):
             # Measuring time t2
             # t2 = time.time()
             # print(t2-t1)
-        plt.ioff()
-        plt.show()
-        plt.close('Figure 1')
 
 
 def main():

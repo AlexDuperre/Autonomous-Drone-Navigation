@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 """
 
 This program needs to run with the original non-augmented dataset. Add the number of dropped frames to the final number 
-of frames to get the total in the original dataset. 
+of frames to get the total in the original dataset. Or modify the dataset to get all frames.
 
 """
 hyper_params = {
@@ -30,7 +30,7 @@ hyper_params = {
     "skip_frames" : 1
 }
 
-dataset = DND("/windows/aldupd/light dataset V2", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"])
+dataset = DND("/windows/aldupd/val-test set", frames_nb=hyper_params["frame_nb"], subsegment_nb=hyper_params["sub_segment_nb"], overlap=hyper_params["segment_overlap"])
 print("Dataset length: ", dataset.__len__())
 
 
@@ -55,6 +55,7 @@ print(len(train_loader))
 frame_count = 0
 mean = 0
 std = 0
+classes = np.asarray([0, 0, 0, 0, 0])
 for epoch in range(hyper_params["num_epochs"]):
     print("########## Epoch ###########", epoch+1)
 
@@ -67,10 +68,16 @@ for epoch in range(hyper_params["num_epochs"]):
         mean += depth.mean()
         std += depth.std()
 
+        # Count classes
+        onehot = np.zeros((depth.shape[1],5))
+        onehot[np.arange(depth.shape[1]), np.int8(labels.numpy())] = 1
+        classes = classes + onehot.sum(axis=0)
+
     mean = mean/(i+1)
     std = std/(i+1)
 
 print("Number of frames = ",frame_count)
 print("Depth mean = ", mean)
 print("Depth std = ", std)
+print(classes)
 

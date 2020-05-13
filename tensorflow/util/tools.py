@@ -97,12 +97,12 @@ def extract_data(data,idx):
 """
 Iterate a filename from filename_000.xx to fielname_001.hxx
 """
-def indexer(file_path):
+def indexer(file_path, extention='.h5'):
     iteration = 1
     file_exist = True
     while file_exist:
         if os.path.isfile(file_path):
-            file_path = file_path[:-6] + (str(iteration)).zfill(3) + ".h5"
+            file_path = file_path[:-(len(extention)+3)] + (str(iteration)).zfill(3) + extention
             iteration += 1
         else:
             file_exist = False

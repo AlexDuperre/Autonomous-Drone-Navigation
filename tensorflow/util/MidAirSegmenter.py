@@ -29,13 +29,16 @@ class TrajectorySegmenter:
 
         elif len(sequence_length_range) == 1:
             if sequence_length_range[0]>trajectory_length:
-                # start_frames = [0]
+                start_frames = [0]
                 # sequence_lengths = trajectory_length//subsequence_frame_nb[0] * subsequence_frame_nb[0]
                 # print(sequence_lengths)
                 # if trajectory_length//subsequence_frame_nb[0] == 0:
                 #     print("###########sequence too small#############")
-                dataframe = pd.DataFrame([])
-                print("dropped trajectory, length of: ",trajectory_length)
+                #dataframe = pd.DataFrame([])
+                #print("dropped trajectory, length of: ",trajectory_length)
+                sequence_lengths = trajectory_length
+                sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
+                dataframe = pd.DataFrame(sequence)
             else:
                 start_frames = list(
                     range(0, trajectory_length - sequence_length_range[0], sequence_length_range[0] - overlap))
@@ -52,8 +55,10 @@ class TrajectorySegmenter:
                 #     dropped_frames -= dropped_frames//subsequence_frame_nb[0] * subsequence_frame_nb[0]
                 #
                 if dropped_frames > 0:
-                    print("Last {} frames not used for trajectory {}".format(dropped_frames,
+                    print("Last {} frames ADDED for trajectory {}".format(dropped_frames,
                                                                              trajectory))
+                    start_frames.append(start_frames[-1]+sequence_length_range[0])
+                    sequence_lengths.append(dropped_frames)
 
 
                 sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
