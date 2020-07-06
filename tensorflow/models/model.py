@@ -58,17 +58,17 @@ class LSTMModel(nn.Module):
 
         self.fc = nn.Sequential(
             self.fc1,
-            self.relu1,
+            # self.relu1,
             self.dropout,
             self.fc2,
 
         )
 
     def forward(self, x, lengths, h0, c0):
-        batch_size, seq_length, height, width = x[0].shape
+        batch_size, seq_length, ch, height, width = x[0].shape
 
-        images = x[0].reshape(batch_size*seq_length, height, width)
-        images = images.unsqueeze(dim=1)
+        images = x[0].reshape(batch_size*seq_length, ch, height, width)
+        # images = images.unsqueeze(dim=1)
         featuresA = self.densenet(images.float())
         featuresA = featuresA.reshape(batch_size, seq_length,-1)
 
@@ -107,7 +107,7 @@ class ResCNN(nn.Module):
     def __init__(self):
         super(ResCNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(1,64,7,3)
+        self.conv1 = nn.Conv2d(3,64,7,3)
         self.batchNorm1 = nn.BatchNorm2d(64)
         self.relu1 = nn.ReLU()
         self.maxpool = nn.MaxPool2d(3)

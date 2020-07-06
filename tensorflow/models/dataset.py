@@ -25,7 +25,7 @@ class DND(Dataset):
 
     def __getitem__(self, idx):
         # initialize inputs:
-        depth = np.zeros((self.frame_nb,96,160))
+        depth = np.zeros((self.frame_nb,192,320,3))#96,160))
         rel_orientation = np.zeros((self.frame_nb))
         rel_goalx = np.zeros((self.frame_nb))
         rel_goaly = np.zeros((self.frame_nb))
@@ -37,7 +37,7 @@ class DND(Dataset):
         path = self.Table[idx][1]
         f = h5py.File(path, "r")
         length = len(f["GT"][segment[1]:segment[1] + segment[0]])
-        depth[0:length, :,:] = f["depth"][segment[1]:segment[1]+segment[0]]
+        depth[0:length, :,:,:] = f["video"][segment[1]:segment[1]+segment[0]][:,0]
         rel_orientation[0:length] = f["rel_orientation"][segment[1]:segment[1]+segment[0]]
         rel_goalx[0:length] = f["rel_goalx"][segment[1]:segment[1]+segment[0]]
         rel_goaly[0:length] = f["rel_goaly"][segment[1]:segment[1]+segment[0]]

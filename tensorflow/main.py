@@ -26,7 +26,7 @@ from util.confusion_matrix import plot_confusion_matrix
 hyper_params = {
     "validationRatio" : 0.3,
     "validationTestRatio" : 0.5,
-    "pretrained" : True,
+    "pretrained" : False,
     "batch_size" : 100,
     "learning_rate" : 0.001,
     "specific_lr" : 0.00001,
@@ -161,13 +161,14 @@ def main(hyper_params):
         model.train()
         outputs = []
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, lengths, mask) in enumerate(train_loader):
-            depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2], depth.shape[3])
+            depth = torch.nn.functional.interpolate(depth,(96,160,3)).view(depth.shape[0], hyper_params["frame_nb"],3,96,160)
+            # depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2], depth.shape[3])
             rel_orientation = rel_orientation.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goalx = rel_goalx.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goaly = rel_goaly.view(depth.shape[0], hyper_params["frame_nb"], -1)
             labels = labels.view(depth.shape[0], hyper_params["frame_nb"])
 
-            depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :].requires_grad_() #loses one time step of the segment
+            depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :, :].requires_grad_() #loses one time step of the segment
             rel_orientation = rel_orientation[:, 0:-1:hyper_params["skip_frames"]].requires_grad_()
             rel_goalx = rel_goalx[:, 0:-1:hyper_params["skip_frames"]].requires_grad_()
             rel_goaly = rel_goaly[:, 0:-1:hyper_params["skip_frames"]].requires_grad_()
@@ -225,14 +226,16 @@ def main(hyper_params):
             meanLoss = 0
             mean_pathLoss = 0
             for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, lengths, mask) in enumerate(valid_loader):
-                depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2],
-                                   depth.shape[3])
+                # depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2],
+                #                    depth.shape[3])
+                depth = torch.nn.functional.interpolate(depth, (96, 160, 3)).view(depth.shape[0],
+                                                                                  hyper_params["frame_nb"], 3, 96, 160)
                 rel_orientation = rel_orientation.view(depth.shape[0], hyper_params["frame_nb"], -1)
                 rel_goalx = rel_goalx.view(depth.shape[0], hyper_params["frame_nb"], -1)
                 rel_goaly = rel_goaly.view(depth.shape[0], hyper_params["frame_nb"], -1)
                 labels = labels.view(depth.shape[0], hyper_params["frame_nb"])
 
-                depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :]
+                depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :, :]
                 rel_orientation = rel_orientation[:, 0:-1:hyper_params["skip_frames"], :]
                 rel_goalx = rel_goalx[:, 0:-1:hyper_params["skip_frames"], :]
                 rel_goaly = rel_goaly[:, 0:-1:hyper_params["skip_frames"], :]
@@ -302,13 +305,15 @@ def main(hyper_params):
         predictions = np.empty((0,1))
         ground_truth = np.empty((0,1))
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, lengths, mask) in enumerate(test_loader):
-            depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2],depth.shape[3])
+            # depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2],depth.shape[3])
+            depth = torch.nn.functional.interpolate(depth, (96, 160, 3)).view(depth.shape[0], hyper_params["frame_nb"],
+                                                                              3, 96, 160)
             rel_orientation = rel_orientation.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goalx = rel_goalx.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goaly = rel_goaly.view(depth.shape[0], hyper_params["frame_nb"], -1)
             labels = labels.view(depth.shape[0], hyper_params["frame_nb"])
 
-            depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :]
+            depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :, :]
             rel_orientation = rel_orientation[:, 0:-1:hyper_params["skip_frames"], :]
             rel_goalx = rel_goalx[:, 0:-1:hyper_params["skip_frames"], :]
             rel_goaly = rel_goaly[:, 0:-1:hyper_params["skip_frames"], :]
