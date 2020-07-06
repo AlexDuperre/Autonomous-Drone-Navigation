@@ -36,7 +36,7 @@ class TrajectorySegmenter:
                 # if trajectory_length//subsequence_frame_nb[0] == 0:
                 #     print("###########sequence too small#############")
                 # dataframe = pd.DataFrame([])
-                print("dropped trajectory, length of: ",trajectory_length)
+                # print("dropped trajectory, length of: ",trajectory_length)
                 sequence_lengths = trajectory_length
                 start_frames = [0]
                 sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
@@ -115,7 +115,6 @@ class DNDSegmenter(TrajectorySegmenter):
             for name in files:
                 if name.endswith(".h5"):
                     path = os.path.join(root,name).replace('\\','/')
-                    print(path)
                     datasets = h5py.File(path, "r+")
                     trajectory_length = self.__get_trajectory_length__(datasets)
                     segments = self.segment_trajectory(overlap, subsequence_frame_nb, subsequence_nb,

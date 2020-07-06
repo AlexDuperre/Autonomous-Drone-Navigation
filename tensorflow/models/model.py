@@ -9,11 +9,6 @@ class LSTMModel(nn.Module):
 
         ############################################
         # DenseNet section
-        # self.densenet = densenet201(pretrained=True)
-        # first_conv_layer = [nn.Conv2d(1, 3, kernel_size=3, stride=1, padding=2, dilation=1, groups=1, bias=True)]
-        # first_conv_layer.extend(list(self.densenet.features))
-        # self.densenet.features = nn.Sequential(*first_conv_layer)
-        # self.densenet.classifier = nn.Linear(1920, input_dim-3)
 
         self.densenet = ResCNN()
         if Pretrained:
@@ -24,6 +19,8 @@ class LSTMModel(nn.Module):
                             if k.startswith(prefix)}
             self.densenet.load_state_dict(adapted_dict)
 
+        ############################################
+        # Orientation representation
 
         self.dense1 = nn.Linear(2,200)
         self.relu = nn.Tanh()
@@ -61,13 +58,13 @@ class LSTMModel(nn.Module):
 
         self.fc = nn.Sequential(
             self.fc1,
-            # self.bn1,
+            self.relu1,
             self.dropout,
             self.fc2,
 
         )
 
-    def forward(self, x, lengths):
+    def forward(self, x, lengths, h0, c0):
         batch_size, seq_length, height, width = x[0].shape
 
         images = x[0].reshape(batch_size*seq_length, height, width)
@@ -83,11 +80,11 @@ class LSTMModel(nn.Module):
         # pad shorter sequences
         Features = torch.nn.utils.rnn.pack_padded_sequence(Features,lengths, enforce_sorted=False, batch_first=True)
 
-        # Initialize hidden state with zeros
-        h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
-
-        # Initialize cell state
-        c0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+        # # Initialize hidden state with zeros
+        # h0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
+        #
+        # # Initialize cell state
+        # c0 = torch.zeros(self.layer_dim, batch_size, self.hidden_dim).requires_grad_().cuda()
 
         # One time step
         # We need to detach as we are doing truncated backpropagation through time (BPTT)

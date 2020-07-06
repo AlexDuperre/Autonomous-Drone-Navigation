@@ -25,7 +25,9 @@ class weightedLoss(nn.Module):
 
         Orientation_loss = torch.abs(input[1][:,:,0]).view(-1)
 
-        losses = self.crossentropy(outputs.view(-1, outputs.shape[-1]), targets.view(-1)) + Orientation_loss + Distance_loss
+        end_segm_multiplier = (1.5*(input[1][:,:,1]<3) + 1).view(-1)
+
+        losses = self.crossentropy(outputs.view(-1, outputs.shape[-1]), targets.view(-1)) + 2*Orientation_loss + Distance_loss + end_segm_multiplier
         loss = (losses * weights).sum()
 
         return loss
