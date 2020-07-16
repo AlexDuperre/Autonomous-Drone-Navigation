@@ -99,10 +99,14 @@ def predict(model_data_path):
 
             # get current frame telemetry
             data = s2.recv(BUFFER_SIZE)
-            split_data = data.decode().split(',')
+            data = data.decode().split("#")[1]
+            split_data = data.split(',')
             if len(split_data[3].split('.')) > 2:
                 var = split_data[3].split('.')
                 split_data[3] = var[0] + '.' + var[1][0:3]
+
+            collision = split_data[4]
+            split_data = split_data[0:4]
 
             # Calculate relative position and arrow angle
             rel_orientation, display_angle, rel_destination, destination_orientation = telemetry_transform(destination, split_data)

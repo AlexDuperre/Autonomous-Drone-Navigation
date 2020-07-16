@@ -47,6 +47,9 @@ Select the number associated to the world
 
 world_no = 3
 world_strings = ["luxury_home", "luxury_home_2e_floor", "bar", "machine_room", "mechanical_plant", "office", "resto_bar", "scanned_home", "scanned_home_2e_floor"]
+world_ref_coord = [[0,0],[0,0],[10.5,1],[0,0],[20.5,2.5],[1,31],[0,0],[0,0],[0,0]]
+world_ref_dims = [[0,0,0,0],[0,0,0,0],[0, 22, 0, 11],[0,0,0,0],[0,25,0,23],[0,30,0,49],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
+world_runs = [[1],[1],[1, 5, 9, 3, 9, 0, 5, 8, 0],[1],[18,4,9,4,17,22,23,6,16],[7,9,18,3,2,17,4,0,1],[1],[1],[1]]
 
 # Initialize and start keylogger
 keyloggerFct.init()
@@ -101,9 +104,10 @@ def predict(model_data_path):
 
     # Define destination for relative coordinates
     destination_list = get_goals("./destinations.ods",world_no)
-    destination = eval(destination_list[1])
     last_destination_id = 0
-    destination_id = 1
+    destination_id = world_runs[world_no-1][0]
+    destination = eval(destination_list[destination_id])
+    run_list = world_runs[world_no-1]
 
 
 
@@ -161,6 +165,7 @@ def predict(model_data_path):
         trajectoryy = []
         collisionx = []
         collisiony = []
+        run = 1
         while running:
             # Measuring time t1
             # t1 = time.time()
@@ -199,20 +204,16 @@ def predict(model_data_path):
 
                 calls += 1
 
-                if calls % 10 == 0:
-                    if calls == 10:
-                        xini = rel_destination[0]
-                        yini = rel_destination[1]
+                if calls % 5 == 0:
 
-                    print(fix_angle(rel_orientation))
-                    depth = cv2.resize((pred[0,:,:,0]), dsize=(160, 92), interpolation=cv2.INTER_CUBIC) #-0.1792)/0.1497
+                    depth = cv2.resize((pred[0, :, :, 0] - min)/(6.0 - min), dsize=(160, 96), interpolation=cv2.INTER_CUBIC) #-0.1792)/0.1497
                     lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)#*mask #************************
                     orientation = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
                     prev_command = torch.from_numpy((prev_command == np.arange(5))).unsqueeze(0).unsqueeze(0).float()
                     relx = torch.from_numpy(np.array(rel_destination[0])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
                     rely = torch.from_numpy(np.array(rel_destination[1])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
                     lstm_inputB = torch.cat([orientation,torch.sqrt(relx**2 + rely**2)],-1)
-                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], torch.ones([1]), hn, cn) #torch.sqrt(relx**2 + rely**2)
+                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], torch.ones([1]), hn, cn)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
                     prev_command = predicted
@@ -223,8 +224,8 @@ def predict(model_data_path):
                     # subprocess.call(['./activate_window.sh'])
 
                     # create trajectory
-                    x_abs = 10 - destination[1] + rely.view(-1)
-                    y_abs = 1 + destination[0] - relx.view(-1)
+                    x_abs = world_ref_coord[world_no-1][0] - destination[1] + rely.view(-1)
+                    y_abs = world_ref_coord[world_no-1][1] + destination[0] - relx.view(-1)
                     trajectoryx.append(x_abs.tolist())
                     trajectoryy.append(y_abs.tolist())
 
@@ -244,7 +245,7 @@ def predict(model_data_path):
                     elif any(predicted == [1, 2]):
                         print(command)
                         pyautogui.keyUp("w")
-                        pyautogui.keyDown(command, pause=1.)
+                        pyautogui.keyDown(command, pause=0.5)
                         pyautogui.keyUp(command)
 
                         # dt = time.time() - t0
@@ -256,10 +257,6 @@ def predict(model_data_path):
                         pyautogui.keyDown("q", pause=0.5)
                         pyautogui.keyUp("q")
 
-                        # if not start:
-                        #     pyautogui.keyUp("w")
-
-                        # dt = time.time() - t0
 
                     elif predicted == 4:
                         print("w+e")
@@ -274,7 +271,7 @@ def predict(model_data_path):
                         # dt = time.time() - t0
 
                     # Refresh the hidden state (to be deactivated for long sequences)
-                    if calls == 300:
+                    if calls == 150:
                         # Initialize hidden state with zeros
                         hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
                         # Initialize cell state
@@ -284,15 +281,9 @@ def predict(model_data_path):
 
                         calls = 0
 
-                    # if dt > 5.:
-                    #     pyautogui.keyUp("w")
-                    #     start = True
-                    #     print("Reached forward time limit")
-                    #     t0 = 1e-18
-
-                    # print(dt)
 
 
+            # Display Depth
             cv2.imshow("Depth", image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
 
@@ -301,7 +292,7 @@ def predict(model_data_path):
             # print(keyloggerFct.key)
 
             # if statment for auto_navigating flight
-            if (keyloggerFct.key == 'space')  or (np.sqrt(rel_destination[0]**2 + rel_destination[1]**2) < 0.5):
+            if (keyloggerFct.key == 'space')  or (np.sqrt(rel_destination[0]**2 + rel_destination[1]**2) < 0.65):
                 pyautogui.keyUp("w")
                 pyautogui.keyUp("q")
                 pyautogui.keyUp("e")
@@ -313,13 +304,13 @@ def predict(model_data_path):
 
 
                 # save trajectory
-                base = "../Test_paths/ardrone_bar/GT/" + "path_" + str(last_destination_id + 1) + "_" + str(destination_id + 1)
+                base = "./Test_paths/ardrone_" + world_strings[world_no-1] + "/path_" + str(last_destination_id + 1) + "_" + str(destination_id + 1)
                 if not os.path.exists(base):
                     os.makedirs(base)
 
-                background = plt.imread("./Test_paths/ardrone_bar_raw.png")
+                background = plt.imread("./Test_paths/ardrone_" + world_strings[world_no-1] + "_raw.png")
 
-                plt.imshow(background, extent=[0, 22, 0, 11])
+                plt.imshow(background, extent=world_ref_dims[world_no-1])
 
                 plt.plot(trajectoryx,trajectoryy, "bo-")
 
@@ -327,7 +318,7 @@ def predict(model_data_path):
                     plt.plot(collisionx,collisiony, 'yo')
                     print(collisiony)
 
-                plt.axis([0, 22, 0, 12])
+                plt.axis(world_ref_dims[world_no-1])
 
                 plt.savefig(base + "/dist_" + str(np.around(dist,3)) + "_.png", dpi=450, transparent=True)
                 plt.clf()
@@ -338,12 +329,19 @@ def predict(model_data_path):
                 collisionx = []
                 collisiony = []
 
-                auto_navigating = False
+                #auto_navigating = False
+
                 # save last destination and get new destination
                 last_destination_id = destination_id
-                destination_id = np.random.randint(len(destination_list))
-                # destination_id += 1
-                destination = eval(destination_list[destination_id])
+
+                if run == len(run_list):
+                    running = False
+                    print("End of runs")
+                else:
+                    destination_id = run_list[run]  # np.random.randint(len(destination_list))
+                    destination = eval(destination_list[destination_id])
+
+                run += 1
 
                 # Initialize hidden state with zeros
                 hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
@@ -364,6 +362,10 @@ def predict(model_data_path):
                 pyautogui.keyUp("q")
                 pyautogui.keyUp("e")
                 auto_navigating = False
+                trajectoryx = []
+                trajectoryy = []
+                collisionx = []
+                collisiony = []
                 print("RECORDING DISCARDED")
 
             if running:
@@ -377,7 +379,7 @@ def predict(model_data_path):
                 # error reading frame
                 print('error reading video feed')
 
-            # Measuring time t2
+            # # Measuring time t2
             # t2 = time.time()
             # print(t2-t1)
 
