@@ -35,3 +35,5 @@ tensorflow/hyper_params.txt
 tensorflow/util/confusion_matrix.png
 
 tensorflow/util/confusion_matrix.svg
+
+tensorflow/confusion_matrix.svg
