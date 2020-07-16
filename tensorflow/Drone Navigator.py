@@ -188,6 +188,7 @@ def predict(model_data_path):
             # get current frame
             frame = cam.read()
             img = np.array(frame).astype('float32')
+            img = (img - img.min())/(img.max() - img.min())# normalize with min max of image if rgb
             img = np.expand_dims(np.asarray(img), axis=0)
 
             # Evalute the network for the given image
@@ -206,14 +207,17 @@ def predict(model_data_path):
 
                 if calls % 5 == 0:
 
-                    depth = cv2.resize((pred[0, :, :, 0] - min)/(6.0 - min), dsize=(160, 96), interpolation=cv2.INTER_CUBIC) #-0.1792)/0.1497
-                    lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)#*mask #************************
+                    # if calls == 10:
+                    #     xini = rel_destination[0]
+                    #     yini = rel_destination[1]
+                    depth = cv2.resize(img[0], dsize=(160, 96), interpolation=cv2.INTER_CUBIC) #-0.1792)/0.1497
+                    lstm_inputA = torch.from_numpy(depth).view(3,96,160).unsqueeze(0).unsqueeze(0)#*mask #************************
                     orientation = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
                     prev_command = torch.from_numpy((prev_command == np.arange(5))).unsqueeze(0).unsqueeze(0).float()
                     relx = torch.from_numpy(np.array(rel_destination[0])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
                     rely = torch.from_numpy(np.array(rel_destination[1])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
                     lstm_inputB = torch.cat([orientation,torch.sqrt(relx**2 + rely**2)],-1)
-                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], torch.ones([1]), hn, cn)
+                    out, (hn, cn) = model([lstm_inputA, lstm_inputB], torch.ones([1]), hn, cn) #torch.sqrt(relx**2 + rely**2)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
                     prev_command = predicted
@@ -257,6 +261,10 @@ def predict(model_data_path):
                         pyautogui.keyDown("q", pause=0.5)
                         pyautogui.keyUp("q")
 
+                        # if not start:
+                        #     pyautogui.keyUp("w")
+
+                        # dt = time.time() - t0
 
                     elif predicted == 4:
                         print("w+e")
@@ -379,7 +387,7 @@ def predict(model_data_path):
                 # error reading frame
                 print('error reading video feed')
 
-            # # Measuring time t2
+            # Measuring time t2
             # t2 = time.time()
             # print(t2-t1)
 
@@ -395,4 +403,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
