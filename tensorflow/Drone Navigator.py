@@ -32,8 +32,18 @@ import subprocess
 from threading import Thread
 
 """
-Select the number associated to the world
+This code communicates with the drone interface and collects the image feed of the drone as well as its position.
+When launched, the script will allow the drone to reach a destination specified in the script automatically. 
+You only need to press the key T on your keyboard while you have the Drone camera window selected, then press Enter 
+when you are ready to launch the ADG model. At anytime during the flight, you can make the drone land by pressing L, 
+stop the guidance mode by pressing Backspace (then start it with a new point by pressing Enter), or quit by pressing 
+Escape.
 
+To control de drone, please refer to  the https://github.com/Barahlush/ardrone_autopilot GitHub repo.
+The key used to control the drone are W, Q, E, S, A, D, L, U, J
+
+
+To begin, select the number associated to the world
 1 - Luxury home
 2-  Luxury home 2nd floor
 3 - Bar
@@ -43,6 +53,8 @@ Select the number associated to the world
 7 - Resto bar
 8 - Scanned home
 9 - Scanned home 2nd floor
+
+Alexandre Duperre - 09/10/2020
 """
 
 world_no = 3
@@ -85,13 +97,14 @@ keys_dict = {
 }
 
 def predict(model_data_path):
+    # Initialize TCP/IP connection
     TCP_IP = '127.0.0.1'
     TCP_PORT = 5007
     BUFFER_SIZE = 1000
 
     s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    # Connect in that order
+    # Connect to position and video feed (in that order)
     s2.connect((TCP_IP, TCP_PORT))
     time.sleep(3)
     cam = VideoCapture('tcp:127.0.0.1:5005')  # tcp://192.168.1.1:5555 for real drone camera
@@ -118,23 +131,22 @@ def predict(model_data_path):
     net = models.ResNet50UpProj({'data': input_node}, batch_size, 1, False)
 
     # Add Pytorch Navigator network
-
     model = LSTMModel(input_dim=hyper_params["input_dim"],
                   hidden_dim=hyper_params["hidden_dim"],
                   layer_dim=hyper_params["layer_dim"],
                   output_dim=hyper_params["output_dim"],
                   Pretrained=False)
 
+    # Loads the weights
     state_dict = torch.load("./Best_models/BEST/checkpoint.pt")
     model.load_state_dict(state_dict)
+    model.eval()
 
     # Initialize hidden state with zeros
     hn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
     # Initialize cell state
     cn = torch.zeros(hyper_params["layer_dim"], 1, hyper_params["hidden_dim"]).requires_grad_()
 
-    model = model
-    model.eval()
 
     config = tf.ConfigProto(
         device_count =  {"GPU":0}
@@ -170,10 +182,11 @@ def predict(model_data_path):
             # Measuring time t1
             # t1 = time.time()
 
-            # get current frame telemetry
+            # Get and decode current frame telemetry
             data = s2.recv(BUFFER_SIZE)
-            data = data.decode().split("#")[1]
+            data = data.decode().split("#")[1] # Safe character to avoid catching other information
             split_data = data.split(',')
+            # Makes sure no other data is in the last value
             if len(split_data[3].split('.')) > 2:
                 var = split_data[3].split('.')
                 split_data[3] = var[0] + '.' + var[1][0:3]
@@ -190,7 +203,7 @@ def predict(model_data_path):
             img = np.array(frame).astype('float32')
             img = np.expand_dims(np.asarray(img), axis=0)
 
-            # Evalute the network for the given image
+            # Evalaute the network for the given image
             pred = sess.run(net.get_output(), feed_dict={input_node: img})
             min = (pred[0, :, :, 0]).min()
             max = (pred[0, :, :, 0]).max()
@@ -206,6 +219,7 @@ def predict(model_data_path):
 
                 if calls % 5 == 0:
 
+                    # Reshape and normalize image and reshape the position into a tensor
                     depth = cv2.resize((pred[0, :, :, 0] - min)/(6.0 - min), dsize=(160, 96), interpolation=cv2.INTER_CUBIC) #-0.1792)/0.1497
                     lstm_inputA = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)#*mask #************************
                     orientation = torch.from_numpy(np.asarray(fix_angle(rel_orientation))).unsqueeze(0).unsqueeze(0).unsqueeze(0)
@@ -213,6 +227,8 @@ def predict(model_data_path):
                     relx = torch.from_numpy(np.array(rel_destination[0])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
                     rely = torch.from_numpy(np.array(rel_destination[1])).unsqueeze(0).unsqueeze(0).unsqueeze(0).float()
                     lstm_inputB = torch.cat([orientation,torch.sqrt(relx**2 + rely**2)],-1)
+
+                    # Predict the next command
                     out, (hn, cn) = model([lstm_inputA, lstm_inputB], torch.ones([1]), hn, cn)
                     _, predicted = torch.max(out.data, 2)
                     predicted = predicted.numpy()[0][0]
@@ -220,27 +236,27 @@ def predict(model_data_path):
 
                     command = keys_dict[predicted]
 
-                    # makes sure we are in the drone commande window
+                    # Makes sure we are in the drone commande window
                     # subprocess.call(['./activate_window.sh'])
 
-                    # create trajectory
+                    # Saves trajectory
                     x_abs = world_ref_coord[world_no-1][0] - destination[1] + rely.view(-1)
                     y_abs = world_ref_coord[world_no-1][1] + destination[0] - relx.view(-1)
                     trajectoryx.append(x_abs.tolist())
                     trajectoryy.append(y_abs.tolist())
 
+                    # Saves instants where collisions are registered
                     if collision == '1':
                         print('collision')
                         collisionx.append(x_abs.tolist())
                         collisiony.append(y_abs.tolist())
 
+
+                    #  Executes the predicted command by simulating a keypress
                     if predicted == 0:
                         print("w")
                         pyautogui.keyDown(command)
 
-                        # if start:
-                        #     t0 = time.time()
-                        #     start = False
 
                     elif any(predicted == [1, 2]):
                         print(command)
@@ -248,7 +264,6 @@ def predict(model_data_path):
                         pyautogui.keyDown(command, pause=0.5)
                         pyautogui.keyUp(command)
 
-                        # dt = time.time() - t0
 
                     elif predicted == 3:
                         print("w+q")
@@ -265,10 +280,7 @@ def predict(model_data_path):
                         pyautogui.keyDown("e", pause=0.5)
                         pyautogui.keyUp("e")
 
-                        # if not start:
-                        #     pyautogui.keyUp("w")
-                        #
-                        # dt = time.time() - t0
+
 
                     # Refresh the hidden state (to be deactivated for long sequences)
                     if calls == 150:
@@ -297,13 +309,13 @@ def predict(model_data_path):
                 pyautogui.keyUp("q")
                 pyautogui.keyUp("e")
 
-                # Calculate distance
+                # Calculate distance travelled
                 dist = 0
                 for i in range(len(trajectoryx)-1):
                     dist += np.sqrt((trajectoryx[i+1][0]-trajectoryx[i][0])**2 + (trajectoryy[i+1][0]-trajectoryy[i][0])**2)
 
 
-                # save trajectory
+                # Save trajectory
                 base = "./Test_paths/ardrone_" + world_strings[world_no-1] + "/path_" + str(last_destination_id + 1) + "_" + str(destination_id + 1)
                 if not os.path.exists(base):
                     os.makedirs(base)
@@ -387,7 +399,7 @@ def predict(model_data_path):
 def main():
     model_path = "./checkpoint/NYU_FCRN.ckpt"
 
-    # Predict the image
+    # Launch the code
     pred = predict(model_path)
 
     os._exit(0)

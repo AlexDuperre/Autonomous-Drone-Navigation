@@ -7,6 +7,13 @@ from matplotlib.pylab import cm
 import numpy as np
 import pyexcel_ods
 
+""" 
+
+This script contains the useful tools to process the data in the main scripts
+
+Alexandre Duperre - 09/10/2020
+"""
+
 
 """
 bufferless VideoCapture functions
@@ -110,6 +117,9 @@ def indexer(file_path, extention='.h5'):
 
     return file_path
 
+"""
+Fix the angle from ROS by normalizing it between -1 and 1
+"""
 def fix_angle(rel_orientation):
     # makes sure the angle is between pi and - pi
     if rel_orientation > np.pi:
