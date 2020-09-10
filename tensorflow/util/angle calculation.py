@@ -1,6 +1,8 @@
 import numpy as np
 
-
+"""
+Angle calculation tests
+"""
 v1 = (1,0)
 v2 = (0,-1)
 

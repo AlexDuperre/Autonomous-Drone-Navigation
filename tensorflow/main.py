@@ -22,6 +22,17 @@ from sklearn.metrics import confusion_matrix
 from util.confusion_matrix import plot_confusion_matrix
 # from GPUtil import showUtilization as gpu_usage
 
+"""
+
+This script allows to train the Autonomous Drone Guidance ADG model. It follows a standard procedure like all pytorch 
+training scripts: Dataset import and dataset loader, train, validation and test phases.
+
+All hyperparameters are contained in the dictionary below and will be saved along with training curves, confusion matrix
+and custom_loss.py file for tracability into the Comet.ml interface.
+
+
+Alexandre Duperre  -  09/10/2020
+"""
 
 hyper_params = {
     "validationRatio" : 0.3,
@@ -56,7 +67,7 @@ def main(hyper_params):
     f.write(str(hyper_params))
     f.close()
 
-    # Logging parameters for COMET
+    # Logging parameters for COMET *** TO CHANGE IF RUNNING WITH OTHER USER ***
     experiment = Experiment(api_key="rdQN9vxDPj1stp3lh9rIYZfDE",
                             project_name="ADN", workspace="alexduperre")
     experiment.log_parameters(hyper_params)
@@ -135,7 +146,7 @@ def main(hyper_params):
     criterion = weightedLoss()
     val_loss = pathLoss(frequency=10)
 
-    # Optimzer
+    # Optimzer settings
     optimizer = torch.optim.Adam([{"params": model.densenet.parameters(), "lr": hyper_params["specific_lr"]},
                                   {"params": model.lstm.parameters()},
                                   {"params": model.fc.parameters()},
@@ -147,6 +158,7 @@ def main(hyper_params):
 
     print("model loaded")
 
+    # TRAINING PHASE
     trainLoss = []
     validLoss = []
     validAcc = []
@@ -161,12 +173,14 @@ def main(hyper_params):
         model.train()
         outputs = []
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, lengths, mask) in enumerate(train_loader):
+            # Ensure shapes are ok
             depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2], depth.shape[3])
             rel_orientation = rel_orientation.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goalx = rel_goalx.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goaly = rel_goaly.view(depth.shape[0], hyper_params["frame_nb"], -1)
             labels = labels.view(depth.shape[0], hyper_params["frame_nb"])
 
+            # Select frames according to the skip frame hyperparameter
             depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :].requires_grad_() #loses one time step of the segment
             rel_orientation = rel_orientation[:, 0:-1:hyper_params["skip_frames"]].requires_grad_()
             rel_goalx = rel_goalx[:, 0:-1:hyper_params["skip_frames"]].requires_grad_()
@@ -180,22 +194,19 @@ def main(hyper_params):
             # Initialize cell state
             c0 = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).requires_grad_().cuda()
 
-            # mask = torch.zeros([1, 1, 96, 160])
-            # mask[0, 0, 32:64, 53:106] = 1
-            # mask = mask.cuda()
-
+            # Pack inputs for the model
             inputA = depth.cuda()
             inputB = torch.cat([rel_orientation, torch.sqrt(rel_goalx**2 + rel_goaly**2)], -1).cuda()
             input = [inputA, inputB.float()]
+            # Send lengths to cuds for varible sequence handling
             lengths = lengths.cuda()
             label = labels.cuda()
 
             # Forward pass
             outputs, (hn, cn) = model(input, lengths, h0, c0)
 
-            # loss = criterion(outputs.view(-1,6), label.view(-1))
+            # Calculate loss
             loss = criterion(outputs, label, input, mask)
-            # loss = criterion(outputs, label)
             meanLoss += loss.cpu().detach().numpy()
 
             # Backward and optimize
@@ -205,7 +216,7 @@ def main(hyper_params):
 
             experiment.log_metric("train_batch_loss", loss.item(), step=step+i+1)
 
-
+            # Display training stats
             if (i + 1) % 8 == 0:
                 print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                       .format(epoch + 1, hyper_params["num_epochs"], i + 1, total_step, loss.item()))
@@ -225,6 +236,7 @@ def main(hyper_params):
             meanLoss = 0
             mean_pathLoss = 0
             for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, lengths, mask) in enumerate(valid_loader):
+                # Ensure shapes are ok
                 depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2],
                                    depth.shape[3])
                 rel_orientation = rel_orientation.view(depth.shape[0], hyper_params["frame_nb"], -1)
@@ -232,6 +244,7 @@ def main(hyper_params):
                 rel_goaly = rel_goaly.view(depth.shape[0], hyper_params["frame_nb"], -1)
                 labels = labels.view(depth.shape[0], hyper_params["frame_nb"])
 
+                # Select frames according to the skip frame hyperparameter
                 depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :]
                 rel_orientation = rel_orientation[:, 0:-1:hyper_params["skip_frames"], :]
                 rel_goalx = rel_goalx[:, 0:-1:hyper_params["skip_frames"], :]
@@ -247,6 +260,7 @@ def main(hyper_params):
                 c0 = torch.zeros(hyper_params["layer_dim"], depth.shape[0],
                                  hyper_params["hidden_dim"]).requires_grad_().cuda()
 
+                # Pack inputs for the model
                 inputA = depth.cuda()
                 inputB = torch.cat([rel_orientation, torch.sqrt(rel_goalx** 2 + rel_goaly** 2)], -1).cuda()
                 input = [inputA, inputB.float()]
@@ -255,7 +269,7 @@ def main(hyper_params):
                 # Forward pass
                 outputs, (hn, cn) = model(input, lengths, h0, c0)
 
-                # loss = criterion(outputs.view(-1, 6), label.view(-1))
+                # Calculate loss
                 loss = criterion(outputs, label, input, mask)
                 pathLoss = val_loss(outputs, label, epoch)
 
@@ -266,11 +280,12 @@ def main(hyper_params):
                 correct += (predicted.view(-1) == label.view(-1)).sum().item()
 
 
-
+            # Calculate accuracy
             acc = 100 * correct / total
             if acc > best_val_acc:
                 best_val_acc = acc
 
+            # Display stats and log into Comet.ml
             print('Validation Accuracy : {} %, Loss : {:.4f}'.format(acc, meanLoss / (i+1)))
             validLoss.append(meanLoss / len(valid_loader))
             validAcc.append(acc)
@@ -289,7 +304,9 @@ def main(hyper_params):
             print("Early stopping")
             break
 
+    # TEST PHASE
     print("Running on test set")
+    # Load best model
     state_dict = torch.load("checkpoint.pt")
     model.load_state_dict(state_dict)
     model.cuda()
@@ -302,12 +319,14 @@ def main(hyper_params):
         predictions = np.empty((0,1))
         ground_truth = np.empty((0,1))
         for i, (depth, rel_orientation, rel_goalx, rel_goaly, labels, lengths, mask) in enumerate(test_loader):
+            # Ensure shapes are ok
             depth = depth.view(depth.shape[0], hyper_params["frame_nb"], depth.shape[2],depth.shape[3])
             rel_orientation = rel_orientation.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goalx = rel_goalx.view(depth.shape[0], hyper_params["frame_nb"], -1)
             rel_goaly = rel_goaly.view(depth.shape[0], hyper_params["frame_nb"], -1)
             labels = labels.view(depth.shape[0], hyper_params["frame_nb"])
 
+            # Select frames according to the skip frame hyperparameter
             depth = depth[:, 0:-1:hyper_params["skip_frames"], :, :]
             rel_orientation = rel_orientation[:, 0:-1:hyper_params["skip_frames"], :]
             rel_goalx = rel_goalx[:, 0:-1:hyper_params["skip_frames"], :]
@@ -321,6 +340,7 @@ def main(hyper_params):
             # Initialize cell state
             c0 = torch.zeros(hyper_params["layer_dim"], depth.shape[0], hyper_params["hidden_dim"]).requires_grad_().cuda()
 
+            # Pack inputs for the model
             inputA = depth.cuda()
             inputB = torch.cat([rel_orientation, torch.sqrt(rel_goalx**2 + rel_goaly**2)], -1).cuda()
             input = [inputA, inputB.float()]
@@ -331,7 +351,7 @@ def main(hyper_params):
             outputs, (hn, cn) = model(input, lengths, h0, c0)
 
 
-            # loss = criterion(outputs.view(-1,6), label.view(-1))
+            # Calculate loss
             loss = criterion(outputs, label, input, mask)
             pathLoss = val_loss(outputs, label, epoch)
             meanLoss += loss.cpu().detach().numpy()
@@ -354,17 +374,6 @@ def main(hyper_params):
     experiment.log_metric("test_accuracy", test_acc, step=epoch)
     experiment.log_metric("test_path_loss", mean_pathLoss / (i+1), step=epoch)
 
-    # # plotting graphs (not needed if using comet ml)
-    # plt.figure()
-    # x = np.linspace(0,hyper_params["num_epochs"],hyper_params["num_epochs"])
-    # plt.subplot(1,2,1)
-    # plt.plot(x,trainLoss)
-    # plt.plot(x,validLoss)
-    #
-    # plt.subplot(1,2,2)
-    # plt.plot(x,validAcc)
-    # plt.savefig(path+'/learning_curve.png')
-    # plt.show()
 
     # Plotting confusion matrix
     plt.figure()

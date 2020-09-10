@@ -9,6 +9,14 @@ import pyexcel_ods
 import matplotlib.pyplot as plt
 import torch
 
+""" 
+
+This script contains the useful tools to process the data in the main scripts
+
+Alexandre Duperre - 09/10/2020
+"""
+
+
 """
 bufferless VideoCapture functions
 """

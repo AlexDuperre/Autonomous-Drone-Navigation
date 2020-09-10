@@ -15,10 +15,15 @@ from util.Exceptions import InvalidSizeException
 
 
 class TrajectorySegmenter:
+    """
+    Ouputs a list containing every possible sequence according to hyperparameters. Contains the location of the trajectory
+    from which the sequence will be extracted with the sequence length and start point.
+    """
     def segment_trajectory(self, overlap, subsequence_frame_nb, subsequence_nb, trajectory,
                            trajectory_length):
         sequence_length_range = (subsequence_frame_nb[0] * subsequence_nb,)
 
+        # Add whole sequence if not specified
         if sequence_length_range is None:
             start_frames = [0]
             sequence_lengths = trajectory_length
@@ -27,7 +32,9 @@ class TrajectorySegmenter:
             # serialization_destination.create_dataset('trajectory_segments', data=dataframe.to_numpy())
             return dataframe.values.tolist()
 
+        # For sequences of fixed lengths
         elif len(sequence_length_range) == 1:
+            # If trajectory is shorter than required sequence length
             if sequence_length_range[0]>trajectory_length:
                 ## Divide sequences in sub sequences
                 # start_frames = [0]
@@ -37,6 +44,7 @@ class TrajectorySegmenter:
                 #     print("###########sequence too small#############")
                 # dataframe = pd.DataFrame([])
                 # print("dropped trajectory, length of: ",trajectory_length)
+
                 sequence_lengths = trajectory_length
                 start_frames = [0]
                 sequence = {"sequence_length": sequence_lengths, "start_frame_index": start_frames}
@@ -61,6 +69,7 @@ class TrajectorySegmenter:
                 #     print("Last {} frames not used for trajectory {}".format(dropped_frames,
                 #                                                              trajectory))
 
+                # If end of sequence is longer than 60% of required length : ok, else: get full length form end of trajectory
                 if (dropped_frames > 0) & (dropped_frames > 0.6*sequence_length_range[0]):
                     start_frames.append(start_frames[-1]+sequence_length_range[0])
                     sequence_lengths.append(dropped_frames)
@@ -75,6 +84,7 @@ class TrajectorySegmenter:
             # serialization_destination.create_dataset('trajectory_segments', data=dataframe.to_numpy())
             return dataframe.values.tolist()
 
+        # If sequences can vary in length
         elif len(sequence_length_range) == 2:
             sequence = {"sequence_length": [], "start_frame_index": []}
             start = 0
@@ -120,7 +130,6 @@ class DNDSegmenter(TrajectorySegmenter):
                     segments = self.segment_trajectory(overlap, subsequence_frame_nb, subsequence_nb,
                                                        name, trajectory_length)
                     if segments != []:
-                        segments = self.data_balancer(datasets, segments)
                         segment_list.extend(segments)
                         path_list.extend(len(segments)*[path])
         return list(zip(segment_list,path_list))
@@ -128,21 +137,3 @@ class DNDSegmenter(TrajectorySegmenter):
     def __get_trajectory_length__(self, datasets):
             return datasets["GT"].len()
 
-    def data_balancer(self, dataset, segments):
-        # new_segments = []
-        # for segment in segments:
-        #
-        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==2):
-        #         new_segments.extend(2*[segment])
-        #
-        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==3):
-        #         new_segments.extend(2*[segment])
-        #
-        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==4):
-        #         new_segments.extend(15*[segment])
-        #
-        #     if any((dataset["GT"][segment[1]:segment[1] + segment[0]]).astype(int)==5):
-        #         new_segments.extend(15*[segment])
-        #
-        # segments.extend(new_segments)
-        return segments
