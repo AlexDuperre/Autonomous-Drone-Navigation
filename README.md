@@ -27,7 +27,7 @@ The worlds will need to be located to the appropriate location according to the 
 
     $HOME./gazebo/models/<example_world>
 
-(Link for the files will be here soon)
+(Worlds are on the yellow HDD held by Sofiane Achiche)
 
 ## Usage explanation
 The main branch of this project will allow you to train the Automated Drone Guidance (AGN) model. In order to do so, you need to download and extract the chosen version of the Drone Guidance Dataset (DGD) and modify the path in the main.py file to be able to access it.
@@ -45,7 +45,7 @@ In any case you should select one environment in the datset for the validation/t
 (Link will be uploaded soon)
 
 Il you choose to use a pretrained encoder for the depth image, please make sure you have the option turned on in tne main.py and the checkpoint.pt in the /Best_models/Autoencoder/8/ location.
-(Link will be uploaded soon)
+(Checkpoint is on the yellow HDD held by Sofiane Achiche)
 
 After setting up the training files, it will be possible to launch the main.py file to begin training. Different hyperparameters can be used by modifying the hyperparm dictionnary in the main.py file.
 
@@ -97,5 +97,5 @@ To control de drone, please refer to the modified table below from the https://g
 
 ## Link to the pretrained model
 
-(Link will be uploaded soon)
+Models are on the yellow HDD held by Sofiane Achiche. The best model is by default loaded in the main drone navigator script.
    
